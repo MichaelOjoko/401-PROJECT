@@ -52,6 +52,7 @@ module.exports = {
 				// put routes here 
 				aliases: {
 					"POST user": "core-logic.createUser",
+					"GET hello": "core-logic.hello",
 				},
 
 				/**
