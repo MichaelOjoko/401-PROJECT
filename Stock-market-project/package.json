@@ -25,7 +25,7 @@
     "moleculer-repl": "^0.7.3"
   },
   "dependencies": {
-    "moleculer": "^0.14.26",
+    "moleculer": "^0.14.35",
     "moleculer-db": "^0.8.29",
     "moleculer-db-adapter-mongo": "^0.4.15",
     "moleculer-web": "^0.10.4",
