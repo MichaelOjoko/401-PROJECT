@@ -17,7 +17,7 @@ module.exports = {
 	/** @type {ApiSettingsSchema} More info about settings: https://moleculer.services/docs/0.14/moleculer-web.html */
 	settings: {
 		// Exposed port
-		port: process.env.PORT || 3000,
+		port: 3000,
 
 		// Exposed IP
 		ip: "0.0.0.0",
@@ -49,10 +49,29 @@ module.exports = {
 				// The gateway will dynamically build the full routes from service schema.
 				autoAliases: true,
 
-				// put routes here 
 				aliases: {
-					"POST user": "core-logic.createUser",
-					"GET hello": "core-logic.hello",
+					// ========== User Authentication ==========
+					"POST /users/register": "core-logic.registerUser",
+					"POST /users/login": "core-logic.loginUser",
+
+					// ========== Stock Management ==========
+					"POST /stocks": "core-logic.createStock",
+					"GET /stocks/:id": "core-logic.getStock",
+					"PUT /stocks/:id": "core-logic.updateStock",
+					"DELETE /stocks/:id": "core-logic.deleteStock",
+
+					// ========== Market Endpoints ==========
+					"GET /market/market-open": "core-logic.isMarketOpen",
+					"GET /market/schedule": "core-logic.getMarketSchedule",
+					"PUT /market/schedule": "core-logic.updateMarketSchedule",
+					"GET /market/holidays": "core-logic.getAllHolidays",
+					"POST /market/holidays": "core-logic.addHoliday",
+					"DELETE /market/holidays/:holiday_date": "core-logic.deleteHoliday",
+					"DELETE /market/holidays": "core-logic.deleteAllHolidays",
+
+					// ========== User Balance ==========
+					"GET /user-balances/:userId": "core-logic.getUserBalance",
+					"PUT /user-balances/:userId": "core-logic.updateUserBalance",
 				},
 
 				/**
