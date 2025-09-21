@@ -5,13 +5,17 @@ services:
   api:
     build:
       context: .
-    image: Stock-market-project
     env_file: docker-compose.env
     environment:
       SERVICES: api
       PORT: 3000
+      PGHOST: postgres
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      PGDATABASE: stockdb
     depends_on:
       - nats
+      - postgres
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.api-gw.rule=PathPrefix(`/`)"
@@ -19,35 +23,33 @@ services:
     networks:
       - internal
 
-  greeter:
+  core-logic:
     build:
       context: .
-    image: Stock-market-project
     env_file: docker-compose.env
     environment:
-      SERVICES: greeter
+      SERVICES: core-logic
+      PGHOST: postgres
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      PGDATABASE: stockdb
     depends_on:
       - nats
+      - postgres
     networks:
       - internal
 
-  products:
-    build:
-      context: .
-    image: Stock-market-project
-    env_file: docker-compose.env
+  postgres:
+    image: postgres:15
+    restart: always
     environment:
-      SERVICES: products
-    depends_on:
-      - mongo
-      - nats
-    networks:
-      - internal
-
-  mongo:
-    image: mongo:4
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: stockdb
+    ports:
+      - "5432:5432" # optional, lets you connect from host (psql, pgAdmin, etc.)
     volumes:
-      - data:/data/db
+      - pgdata:/var/lib/postgresql/data
     networks:
       - internal
 
@@ -76,3 +78,4 @@ networks:
 
 volumes:
   data:
+  pgdata:
