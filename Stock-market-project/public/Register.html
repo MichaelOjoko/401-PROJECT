@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, minimal-ui" />
+  <title>MCM Stocks — Register</title>
+
+  <!-- Fonts / Icons -->
+  <link href="https://fonts.googleapis.com/css?family=Source+Sans+Pro:300,400,600,700" rel="stylesheet" />
+  <link href="https://unpkg.com/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet" />
+
+  <!-- Styles -->
+  <link rel="stylesheet" href="./main.css" />
+
+  <!-- Auth service -->
+  <script src="./auth.service.js"></script>
+</head>
+<body>
+  <!-- Header / Nav -->
+  <header>
+    <div style="font-weight:700">MCM Stocks</div>
+    <nav>
+      <ul>
+        <li><a href="index.html">Home</a></li>
+        <li><a href="trade.html">Trade</a></li>
+        <li><a href="cash.html">Cash</a></li>
+        <li><a href="login.html">Login</a></li>
+        <li><a href="register.html" class="active">Register</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <!-- Register Section -->
+  <main>
+    <section id="register">
+      <div class="content auth card">
+        <h1>Register</h1>
+
+        <label>Full Name</label>
+        <input id="reg-fullname" type="text" required />
+
+        <label>Email</label>
+        <input id="reg-email" type="email" required />
+
+        <label>Phone</label>
+        <input id="reg-phone" type="tel" />
+
+        <label>Username</label>
+        <input id="reg-username" type="text" required />
+
+        <label>Password</label>
+        <input id="reg-password" type="password" required />
+
+        <label>Confirm Password</label>
+        <input id="reg-confirm" type="password" required />
+
+        <button class="button positive" onclick="doRegister()" style="margin-top:12px">
+          <i class="fa fa-user-plus"></i> Create Account
+        </button>
+
+        <p class="muted" style="margin-top:10px">
+          Already have an account? <a href="login.html">Login</a>
+        </p>
+
+        <p id="reg-error" class="error"></p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="content" style="padding-bottom:32px;">
+    <p class="muted">© 2025 MCM Stocks</p>
+  </footer>
+
+  <script>
+    async function doRegister() {
+      const fullName = document.getElementById("reg-fullname").value.trim();
+      const email    = document.getElementById("reg-email").value.trim();
+      const phone    = document.getElementById("reg-phone").value.trim();
+      const username = document.getElementById("reg-username").value.trim();
+      const password = document.getElementById("reg-password").value;
+      const confirm  = document.getElementById("reg-confirm").value;
+      const errorEl  = document.getElementById("reg-error");
+
+      errorEl.textContent = "";
+
+      if (!fullName || !email || !username || !password) {
+        errorEl.textContent = "Please fill all required fields.";
+        return;
+      }
+      if (password !== confirm) {
+        errorEl.textContent = "Passwords do not match.";
+        return;
+      }
+
+      try {
+        const r = await AuthAPI.register({ fullName, email, phone, username, password });
+        if (!r.ok) {
+          errorEl.textContent = (r.data && r.data.message) || "Registration failed.";
+          return;
+        }
+        // On success → redirect to login
+        window.location.href = "login.html";
+      } catch (err) {
+        errorEl.textContent = err.message || "Registration error.";
+      }
+    }
+  </script>
+</body>
+</html>

@@ -44,14 +44,21 @@ nav ul {
 }
 
 nav li {
-  cursor: pointer;
+  border-radius: 6px;
+}
+
+/* 👇 New link styles */
+nav a {
+  display: block;
   padding: 6px 10px;
+  color: var(--white);
+  text-decoration: none;
   border-radius: 6px;
   transition: 0.2s;
 }
 
-nav li.active,
-nav li:hover {
+nav a:hover,
+nav a.active {
   background: var(--gold);
   color: var(--black);
 }
