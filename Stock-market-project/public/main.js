@@ -1,84 +1,79 @@
 // services/auth.service.js
-// Lightweight auth helper for MCM Stock App (CDN Vue)
+// Lightweight auth helper for MCM Stock App (Vue via CDN)
 // - Same-origin by default (API_BASE = '')
-// - Adjust ENDPOINTS below to match your backend
+// - Endpoints match Moleculer-Web aliases in api.service.js
 // - Exposes `window.AuthAPI`
 
 ;(function () {
-  // ============
+  // =================
   // CONFIG
-  // ============
-  const API_BASE =
-    (window.APP_CONFIG && window.APP_CONFIG.API_BASE) || ""; // e.g. "http://localhost:3000"
+  // =================
+  const API_BASE = (window.APP_CONFIG && window.APP_CONFIG.API_BASE) || ""; // e.g. "http://localhost:3000"
 
   const ENDPOINTS = {
-    login:    "/api/v1/identity/auth/signin", // POST
-    register: "/api/v1/identity/auth/signup", // POST (change if your backend differs)
-    me:       "/api/v1/identity/auth/me"      // GET  (optional; change or leave as-is)
+    login:    "/api/users/login",     // POST -> core-logic.loginUser
+    register: "/api/users/register",  // POST -> core-logic.registerUser
+    me:       "/api/users/me"         // optional; keep if you implement it
   };
 
   // localStorage keys
   const LS_KEYS = {
-    token: "auth.token",
-    tenant: "auth.tenant",
-    username: "auth.username"
+    token:   "auth.token",
+    tenant:  "auth.tenant",
+    email:   "auth.email",
+    name:    "auth.name"
   };
 
-  // ============
+  // =================
   // INTERNAL UTILS
-  // ============
+  // =================
   function toUrl(path) {
-    // Support absolute URLs or relative API paths
     if (/^https?:\/\//i.test(path)) return path;
     return API_BASE + path;
   }
 
   function jsonSafeParse(text) {
-    try { return JSON.parse(text); } catch (e) { return {}; }
+    try { return JSON.parse(text); } catch (_) { return {}; }
   }
 
   async function coreFetch(path, opts = {}) {
     const url = toUrl(path);
     const res = await fetch(url, opts);
-    // Attempt to parse JSON; if none, use empty object
     let data = {};
     try {
-      // Some APIs return JSON with proper content-type, others don't.
       const raw = await res.text();
       data = raw ? jsonSafeParse(raw) : {};
-    } catch (_) {
-      data = {};
-    }
+    } catch (_) { data = {}; }
     return { res, data };
   }
 
-  // ============
+  // =================
   // STORAGE
-  // ============
-  function storeAuth({ token, tenant, username }) {
-    if (token != null)   localStorage.setItem(LS_KEYS.token, token);
-    if (tenant != null)  localStorage.setItem(LS_KEYS.tenant, tenant);
-    if (username != null) localStorage.setItem(LS_KEYS.username, username);
-    // Optional: broadcast event for other tabs/components
-    try {
-      window.dispatchEvent(new CustomEvent("auth:changed", { detail: loadAuth() }));
-    } catch (_) {}
+  // =================
+  function storeAuth({ token, tenant, email, name, user }) {
+    if (token != null)  localStorage.setItem(LS_KEYS.token, token);
+    if (tenant != null) localStorage.setItem(LS_KEYS.tenant, tenant);
+    if (email != null)  localStorage.setItem(LS_KEYS.email, email);
+    if (name != null)   localStorage.setItem(LS_KEYS.name, name);
+
+    // Optional: broadcast change
+    try { window.dispatchEvent(new CustomEvent("auth:changed", { detail: loadAuth() })); } catch (_) {}
   }
 
   function clearAuth() {
     localStorage.removeItem(LS_KEYS.token);
     localStorage.removeItem(LS_KEYS.tenant);
-    localStorage.removeItem(LS_KEYS.username);
-    try {
-      window.dispatchEvent(new CustomEvent("auth:changed", { detail: loadAuth() }));
-    } catch (_) {}
+    localStorage.removeItem(LS_KEYS.email);
+    localStorage.removeItem(LS_KEYS.name);
+    try { window.dispatchEvent(new CustomEvent("auth:changed", { detail: loadAuth() })); } catch (_) {}
   }
 
   function loadAuth() {
     return {
-      token: localStorage.getItem(LS_KEYS.token) || "",
+      token:  localStorage.getItem(LS_KEYS.token)  || "",
       tenant: localStorage.getItem(LS_KEYS.tenant) || "",
-      username: localStorage.getItem(LS_KEYS.username) || ""
+      email:  localStorage.getItem(LS_KEYS.email)  || "",
+      name:   localStorage.getItem(LS_KEYS.name)   || ""
     };
   }
 
@@ -86,19 +81,28 @@
     return !!localStorage.getItem(LS_KEYS.token);
   }
 
-  // ============
+  // =================
   // REQUEST HELPERS
-  // ============
+  // =================
   function authHeaders(extra = {}) {
     const { token, tenant } = loadAuth();
-    const hdrs = {
-      "Content-Type": "application/json",
-      ...extra
-    };
-    if (token) hdrs.Authorization = `Bearer ${token}`;
-    // Your code uses "x-tenant"; some backends reply with "x-tenant-id".
-    if (tenant) hdrs["x-tenant"] = tenant;
+    const hdrs = { "Content-Type": "application/json", ...extra };
+    if (token)  hdrs.Authorization = `Bearer ${token}`;
+    if (tenant) hdrs["x-tenant"] = tenant; // keep if you use tenants
     return hdrs;
+  }
+
+  function shape(res, data) {
+    // Token/tenant may come from body OR headers
+    const headerToken  = (res.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
+    const headerTenant = res.headers.get("x-tenant-id") || res.headers.get("x-tenant") || "";
+    return {
+      ok:     res.ok,
+      status: res.status,
+      data,
+      token:  data.token  || headerToken || "",
+      tenant: data.tenant || headerTenant || ""
+    };
   }
 
   async function postJson(path, body, includeAuth = false) {
@@ -117,64 +121,57 @@
     return shape(res, data);
   }
 
-  // Normalize response for the app
-  function shape(res, data) {
-    // Token/tenant may be in headers OR body (depends on your backend)
-    const headerToken = (res.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
-    const headerTenant = res.headers.get("x-tenant-id") || res.headers.get("x-tenant") || "";
+  // =================
+  // PUBLIC ACTIONS
+  // =================
 
-    return {
-      ok: res.ok,
-      status: res.status,
-      data,                // parsed JSON (or {})
-      token: data.token || headerToken || "",
-      tenant: data.tenant || headerTenant || ""
-    };
-  }
-
-  // ============
-  // PUBLIC API
-  // ============
   /**
    * Register a new user.
-   * payload: { fullName, email, phone, username, password }
+   * payload: { fullName, email, password }
    * Returns: { ok, status, data }
    */
   async function register(payload) {
-    // Adjust ENDPOINTS.register if your backend expects a different route or field names
-    return postJson(ENDPOINTS.register, payload, false);
+    // Expect backend to validate & return 201 + { id, fullName, email } on success
+    return postJson(ENDPOINTS.register, {
+      fullName: payload.fullName,
+      email:    payload.email,
+      password: payload.password
+    }, false);
   }
 
   /**
-   * Login user.
-   * payload: { username, password, tenant? }
+   * Login with email + password.
+   * payload: { email, password, tenant? }
    * Returns: { ok, status, data, token, tenant }
    */
   async function login(payload) {
-    const result = await postJson(ENDPOINTS.login, payload, false);
-    // If login succeeded, persist token/tenant/username
+    const result = await postJson(ENDPOINTS.login, {
+      email:    payload.email,
+      password: payload.password,
+      tenant:   payload.tenant || undefined
+    }, false);
+
     if (result.ok && result.token) {
+      const user = result?.data?.user || {};
       storeAuth({
-        token: result.token,
+        token:  result.token,
         tenant: result.tenant || payload.tenant || "",
-        username: payload.username || ""
+        email:  payload.email,
+        name:   user.fullName || user.username || ""
       });
     }
     return result;
   }
 
   /**
-   * Get current user profile (optional endpoint).
-   * Requires Authorization header.
-   * Returns: { ok, status, data }
+   * Optional: current-user profile (if you wire it up).
    */
   async function me() {
     return getJson(ENDPOINTS.me, true);
   }
 
   /**
-   * Fetch wrapper that automatically includes Authorization + x-tenant.
-   * Example: AuthAPI.fetch('/api/secure/resource', { method: 'GET' })
+   * Authorized fetch helper.
    */
   async function fetchAuth(path, options = {}) {
     const headers = authHeaders(options.headers || {});
@@ -182,13 +179,12 @@
     return shape(res, data);
   }
 
-  // ============
+  // =================
   // EXPORT
-  // ============
+  // =================
   window.AuthAPI = {
-    // endpoints (in case you need to read/change at runtime)
     ENDPOINTS,
-    // auth state
+    // state
     storeAuth,
     loadAuth,
     clearAuth,

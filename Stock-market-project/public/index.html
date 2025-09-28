@@ -18,9 +18,8 @@
   <!-- Your global styles -->
   <link rel="stylesheet" href="./main.css" />
 
-  <!-- Auth helper (lives in /services, so go up one level from /public) -->
+  <!-- Auth helper (must define AuthAPI.*) -->
   <script src="main.js"></script>
-
 </head>
 <body>
   <div id="app">
@@ -29,7 +28,7 @@
       <div style="font-weight:700">MCM Stocks</div>
       <nav>
         <ul>
-          <li v-for="item in menu"r
+          <li v-for="item in menu"
               :key="item.id"
               :class="{ active: page === item.id }"
               @click="changePage(item.id)">
@@ -47,14 +46,12 @@
       <section id="login" v-if="page === 'login'">
         <div class="content auth card">
           <h1>Login</h1>
-          <label>Username</label>
-          <input v-model.trim="loginForm.username" type="text" placeholder="Username" required>
+
+          <label>Email</label>
+          <input v-model.trim="loginForm.email" type="email" placeholder="you@example.com" required>
 
           <label>Password</label>
           <input v-model="loginForm.password" type="password" placeholder="Password" required>
-
-          <label>Tenant (optional)</label>
-          <input v-model.trim="loginForm.tenant" type="text" placeholder="Tenant">
 
           <button class="button positive" :disabled="authLoading" @click="doLogin" style="margin-top:12px">
             <i class="fa" :class="authLoading ? 'fa-spinner' : 'fa-sign-in'"></i>
@@ -113,7 +110,7 @@
         </div>
       </section>
 
-      <!-- PLACEHOLDER PAGES (optional) -->
+      <!-- PLACEHOLDER PAGES -->
       <section id="trade" v-if="page === 'trade'">
         <div class="content">
           <div class="card">
@@ -139,28 +136,29 @@
   </div>
 
   <script type="text/javascript">
-    const { createApp, computed } = Vue;
+    const { createApp } = Vue;
 
     createApp({
       data() {
         return {
-          // Simple menu (add more pages as you build them)
           menu: [
             { id: 'home', caption: 'Home' },
             { id: 'trade', caption: 'Trade' },
             { id: 'cash', caption: 'Cash' }
           ],
-
-          // Navigation state
           page: 'login',
 
           // Auth/UI state
           authLoading: false,
           authError: '',
-          loginForm: { username: '', password: '', tenant: '' },
-          regForm: { fullName: '', email: '', phone: '', username: '', password: '', confirm: '' },
 
-          // Minimal profile info (optional)
+          // Simplified login uses email + password
+          loginForm: { email: '', password: '' },
+
+          // Simplified register uses fullName + email + password (+ confirm on UI only)
+          regForm: { fullName: '', email: '', password: '', confirm: '' },
+
+          // Optional profile display
           profileName: ''
         };
       },
@@ -174,7 +172,6 @@
 
       methods: {
         changePage(next) {
-          // Protect pages that require login
           const protectedPages = ['home', 'trade', 'cash'];
           if (protectedPages.includes(next) && !this.hasToken) {
             this.page = 'login';
@@ -190,16 +187,25 @@
 
         async doLogin() {
           this.authError = '';
-          if (!this.loginForm.username || !this.loginForm.password) {
-            this.authError = 'Username and password are required.';
+
+          if (!this.loginForm.email || !this.loginForm.password) {
+            this.authError = 'Email and password are required.';
             return;
           }
+
+          // very light email sanity (frontend only)
+          const basicEmailRx = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+          if (!basicEmailRx.test(this.loginForm.email)) {
+            this.authError = 'Please enter a valid email address.';
+            return;
+          }
+
           this.authLoading = true;
           try {
+            // Expect AuthAPI.login({ email, password }) to POST /api/users/login
             const r = await AuthAPI.login({
-              username: this.loginForm.username,
-              password: this.loginForm.password,
-              tenant: this.loginForm.tenant
+              email: this.loginForm.email,
+              password: this.loginForm.password
             });
             this.authLoading = false;
 
@@ -208,8 +214,16 @@
               return;
             }
 
-            AuthAPI.storeAuth({ token: r.token, tenant: r.tenant, username: this.loginForm.username });
-            this.profileName = this.loginForm.username;
+            const user = r?.data?.user || {};
+            const displayName = user.fullName || user.username || this.loginForm.email;
+
+            AuthAPI.storeAuth({
+              token: r.token,
+              email: this.loginForm.email,
+              user
+            });
+
+            this.profileName = displayName;
             this.changePage('home');
           } catch (err) {
             this.authLoading = false;
@@ -219,21 +233,29 @@
 
         async doRegister() {
           this.authError = '';
-          if (!this.regForm.fullName || !this.regForm.email || !this.regForm.username || !this.regForm.password) {
+
+          if (!this.regForm.fullName || !this.regForm.email || !this.regForm.password) {
             this.authError = 'Please fill all required fields.';
             return;
           }
+
+          const basicEmailRx = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+          if (!basicEmailRx.test(this.regForm.email)) {
+            this.authError = 'Please enter a valid email address.';
+            return;
+          }
+
           if (this.regForm.password !== this.regForm.confirm) {
             this.authError = 'Passwords do not match.';
             return;
           }
+
           this.authLoading = true;
           try {
+            // Expect AuthAPI.register({ fullName, email, password }) to POST /api/users/register
             const r = await AuthAPI.register({
               fullName: this.regForm.fullName,
               email: this.regForm.email,
-              phone: this.regForm.phone,
-              username: this.regForm.username,
               password: this.regForm.password
             });
             this.authLoading = false;
@@ -243,10 +265,9 @@
               return;
             }
 
-            // After registration, take user to login
+            // After registration → go to Login and prefill email
             this.changePage('login');
-            // Pre-fill username
-            this.loginForm.username = this.regForm.username;
+            this.loginForm.email = this.regForm.email;
           } catch (err) {
             this.authLoading = false;
             this.authError = err?.message || 'Registration error';
@@ -261,11 +282,11 @@
       },
 
       mounted() {
-        // Restore last page or force login if no token
+        // Restore last page if already logged in
         const last = localStorage.getItem('lastPage') || 'home';
-        const { token, username } = AuthAPI.loadAuth();
+        const { token, user, email } = AuthAPI.loadAuth ? (AuthAPI.loadAuth() || {}) : {};
         if (token) {
-          this.profileName = username || '';
+          this.profileName = (user && (user.fullName || user.username)) || email || '';
           this.page = last;
         } else {
           this.page = 'login';
