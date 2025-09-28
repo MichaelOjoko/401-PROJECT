@@ -42,12 +42,6 @@
         <label>Email</label>
         <input id="reg-email" type="email" required />
 
-        <label>Phone</label>
-        <input id="reg-phone" type="tel" />
-
-        <label>Username</label>
-        <input id="reg-username" type="text" required />
-
         <label>Password</label>
         <input id="reg-password" type="password" required />
 
@@ -75,33 +69,43 @@
     async function doRegister() {
       const fullName = document.getElementById("reg-fullname").value.trim();
       const email    = document.getElementById("reg-email").value.trim();
-      const phone    = document.getElementById("reg-phone").value.trim();
-      const username = document.getElementById("reg-username").value.trim();
       const password = document.getElementById("reg-password").value;
       const confirm  = document.getElementById("reg-confirm").value;
       const errorEl  = document.getElementById("reg-error");
 
       errorEl.textContent = "";
 
-      if (!fullName || !email || !username || !password) {
+      // Basic validation for required fields
+      if (!fullName || !email || !password) {
         errorEl.textContent = "Please fill all required fields.";
         return;
       }
+
+      // Very light email sanity check (frontend only)
+      const basicEmailRx = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!basicEmailRx.test(email)) {
+        errorEl.textContent = "Please enter a valid email address.";
+        return;
+      }
+
       if (password !== confirm) {
         errorEl.textContent = "Passwords do not match.";
         return;
       }
 
       try {
-        const r = await AuthAPI.register({ fullName, email, phone, username, password });
+        // Call backend via AuthAPI (served by auth.service.js)
+        const r = await AuthAPI.register({ fullName, email, password });
+
         if (!r.ok) {
           errorEl.textContent = (r.data && r.data.message) || "Registration failed.";
           return;
         }
-        // On success → redirect to login
+
+        // On success → go to login
         window.location.href = "login.html";
       } catch (err) {
-        errorEl.textContent = err.message || "Registration error.";
+        errorEl.textContent = err?.message || "Registration error.";
       }
     }
   </script>

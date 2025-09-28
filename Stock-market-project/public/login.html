@@ -14,7 +14,7 @@
 
   <!-- Auth service -->
   <script src="./auth.service.js"></script>
-</head>
+</head> 
 <body>
   <!-- Header / Nav -->
   <header>
@@ -62,32 +62,36 @@
     <p class="muted">© 2025 MCM Stocks</p>
   </footer>
 
-  <script>
-    async function doLogin() {
-      const username = document.getElementById("login-username").value.trim();
-      const password = document.getElementById("login-password").value;
-      const tenant   = document.getElementById("login-tenant").value.trim();
-      const errorEl  = document.getElementById("login-error");
+<!-- public/auth.service.js -->
+<script>
+const AuthAPI = {
+  async login({ username, password, tenant }) {
+    const res = await fetch("/api/users/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password, tenant })
+    });
 
-      errorEl.textContent = "";
+    const data = await res.json().catch(() => ({}));
 
-      if (!username || !password) {
-        errorEl.textContent = "Username and password are required.";
-        return;
-      }
+    // Normalize to the shape your UI expects
+    return {
+      ok: res.ok,
+      token: data.token,      // e.g., JWT returned by core-logic.loginUser
+      data
+    };
+  },
 
-      try {
-        const r = await AuthAPI.login({ username, password, tenant });
-        if (!r.ok || !r.token) {
-          errorEl.textContent = (r.data && r.data.message) || "Login failed.";
-          return;
-        }
-        // On success → go to home
-        window.location.href = "index.html";
-      } catch (err) {
-        errorEl.textContent = err.message || "Login error.";
-      }
-    }
-  </script>
+  async register({ username, password, email, tenant }) {
+    const res = await fetch("/api/users/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password, email, tenant })
+    });
+    return { ok: res.ok, data: await res.json().catch(() => ({})) };
+  }
+};
+</script>
+
 </body>
 </html>
