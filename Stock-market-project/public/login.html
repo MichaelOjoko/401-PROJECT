@@ -12,7 +12,7 @@
   <!-- Styles -->
   <link rel="stylesheet" href="./main.css" />
 
-  <!-- Auth service -->
+  <!-- Auth service (defines window.AuthAPI with /api/users/login & /api/users/register) -->
   <script src="./main.js"></script>
 </head> 
 <body>
@@ -36,13 +36,13 @@
       <div class="content auth card">
         <h1>Login</h1>
 
-        <label>Username</label>
-        <input id="login-username" type="text" placeholder="Username" required />
+        <label>Email</label>
+        <input id="login-email" type="email" placeholder="you@example.com" required />
 
         <label>Password</label>
         <input id="login-password" type="password" placeholder="Password" required />
 
-        <button class="button positive" onclick="doLogin()" style="margin-top:12px">
+        <button id="login-btn" class="button positive" onclick="doLogin()" style="margin-top:12px">
           <i class="fa fa-sign-in"></i> Login
         </button>
 
@@ -59,36 +59,62 @@
     <p class="muted">© 2025 MCM Stocks</p>
   </footer>
 
-<!-- public/auth.service.js -->
-<script>
-const AuthAPI = {
-  async login({ username, password }) {
-    const res = await fetch("/api/users/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username, password, })
+  <script>
+    // Enter-to-submit
+    document.getElementById('login-password').addEventListener('keydown', e => {
+      if (e.key === 'Enter') doLogin();
     });
 
-    const data = await res.json().catch(() => ({}));
+    async function doLogin() {
+      const email    = document.getElementById("login-email").value.trim();
+      const password = document.getElementById("login-password").value;
+      const errorEl  = document.getElementById("login-error");
+      const btn      = document.getElementById("login-btn");
 
-    // Normalize to the shape your UI expects
-    return {
-      ok: res.ok,
-      token: data.token,      // e.g., JWT returned by core-logic.loginUser
-      data
-    };
-  },
+      errorEl.textContent = "";
 
-  async register({ username, password, email }) {
-    const res = await fetch("/api/users/register", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username, password, email })
-    });
-    return { ok: res.ok, data: await res.json().catch(() => ({})) };
-  }
-};
-</script>
+      if (!email || !password) {
+        errorEl.textContent = "Email and password are required.";
+        return;
+      }
+      // very light email sanity (frontend only)
+      const basicEmailRx = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!basicEmailRx.test(email)) {
+        errorEl.textContent = "Please enter a valid email address.";
+        return;
+      }
 
+      // prevent double clicks
+      btn.disabled = true;
+
+      try {
+        // Uses AuthAPI from main.js -> POST /api/users/login with { email, password }
+        const r = await AuthAPI.login({ email, password });
+
+        if (!r.ok || !r.token) {
+          errorEl.textContent = (r.data && r.data.message) || "Login failed.";
+          btn.disabled = false;
+          return;
+        }
+
+        // Persist token/etc. (main.js exposes storeAuth)
+        if (AuthAPI.storeAuth) {
+          const user = (r.data && r.data.user) || {};
+          AuthAPI.storeAuth({
+            token:  r.token,
+            tenant: r.tenant || "",
+            email,
+            name:   user.fullName || user.username || ""
+          });
+        }
+
+        // Success -> go home (or dashboard)
+        window.location.href = "index.html";
+      } catch (err) {
+        errorEl.textContent = err?.message || "Login error.";
+        btn.disabled = false;
+      }
+    }
+  </script>
 </body>
 </html>
