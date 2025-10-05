@@ -6,293 +6,233 @@
     name="viewport"
     content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, minimal-ui"
   />
-  <title>Stock App — Login & Register</title>
+  <title>MCM Stocks — Home</title>
 
-  <!-- Fonts / Icons (optional) -->
+  <!-- Fonts / Icons -->
   <link href="https://fonts.googleapis.com/css?family=Source+Sans+Pro:300,400,600,700" rel="stylesheet" />
   <link href="https://unpkg.com/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet" />
 
-  <!-- Vue 3 (CDN) -->
-  <script src="https://unpkg.com/vue@3.2.34/dist/vue.global.js"></script>
-
-  <!-- Your global styles -->
+  <!-- Global styles -->
   <link rel="stylesheet" href="./main.css" />
 
-  <!-- Auth helper (must define AuthAPI.*) -->
-  <script src="main.js"></script>
+  <!-- Minimal page tweaks that respect your color scheme -->
+  <style>
+    /* Tries to inherit your palette; falls back safely if vars not present */
+    :root {
+      --hero-bg: var(--page-hero, #0b0e11);
+      --hero-fg: var(--page-hero-fg, #ffffff);
+      --accent: var(--brand, #f0c330);
+      --muted-fg: var(--muted, #8b8b8b);
+      --ok: var(--positive, #16c784);
+      --bad: var(--negative, #ea3943);
+      --card-bg-soft: var(--panel, rgba(255,255,255,0.04));
+    }
+    .hero {
+      background: var(--hero-bg);
+      color: var(--hero-fg);
+      padding: 48px 0 40px;
+    }
+    .hero h1 { margin: 0 0 8px; font-size: 32px; line-height: 1.15; }
+    .hero p { margin: 0; color: rgba(255,255,255,0.72); }
+    .hero-cta { margin-top: 16px; display: flex; gap: 10px; flex-wrap: wrap; }
+    .hero .button.ghost {
+      background: transparent; border: 1px solid rgba(255,255,255,0.25); color: #fff;
+    }
+    .strip {
+      background: rgba(255,255,255,0.04);
+      color: rgba(255,255,255,0.85);
+      border-radius: 12px;
+      margin-top: 18px;
+      padding: 12px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 10px;
+    }
+    .stat { display: flex; flex-direction: column; gap: 2px; }
+    .stat .k { font-weight: 700; }
+    .stat .v { font-size: 13px; color: rgba(255,255,255,0.7); }
+
+    .section { padding: 28px 0; }
+    .market-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 12px;
+    }
+    .ticker-card { cursor: pointer; transition: transform .12s ease; }
+    .ticker-card:hover { transform: translateY(-2px); }
+    .row { display: flex; justify-content: space-between; align-items: center; }
+    .sym { font-weight: 700; }
+    .price { font-weight: 700; }
+    .chg.ok { color: var(--ok); }
+    .chg.bad { color: var(--bad); }
+
+    .features {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 12px;
+    }
+    .badge { font-size: 12px; font-weight: 700; color: #111; background: var(--accent); padding: 4px 8px; border-radius: 999px; }
+
+    .cta-band {
+      background: var(--card-bg-soft);
+      border-radius: 14px;
+      display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+      gap: 12px; padding: 16px;
+    }
+  </style>
 </head>
 <body>
-  <div id="app">
-    <!-- Header / Nav -->
-    <header>
-      <div style="font-weight:700">MCM Stocks</div>
-      <nav>
-        <ul>
-          <li v-for="item in menu"
-              :key="item.id"
-              :class="{ active: page === item.id }"
-              @click="changePage(item.id)">
-            {{ item.caption }}
-          </li>
-          <li v-if="!hasToken" :class="{ active: page === 'login' }" @click="changePage('login')">Login</li>
-          <li v-if="!hasToken" :class="{ active: page === 'register' }" @click="changePage('register')">Register</li>
-          <li v-if="hasToken" @click="logout">Logout</li>
-        </ul>
-      </nav>
-    </header>
+  <!-- Header / Nav -->
+  <header>
+    <div style="font-weight:700">MCM Stocks</div>
+    <nav>
+      <ul>
+        <li><a href="index.html" data-top="index.html">Home</a></li>
+        <li><a href="trade.html" data-top="trade.html">Trade</a></li>
+        <li><a href="cash.html" data-top="cash.html">Cash</a></li>
+        <li><a href="login.html" data-top="login.html">Login</a></li>
+        <li><a href="register.html" data-top="register.html">Register</a></li>
+      </ul>
+    </nav>
+  </header>
 
-    <main>
-      <!-- LOGIN PAGE -->
-      <section id="login" v-if="page === 'login'">
-        <div class="content auth card">
-          <h1>Login</h1>
+  <main>
+    <!-- HERO (Binance style: dark hero + CTA + compact strip) -->
+    <section class="hero">
+      <div class="content">
+        <div class="card" style="background:transparent; box-shadow:none;">
+          <div style="display:flex; flex-wrap:wrap; gap:16px; align-items:center; justify-content:space-between;">
+            <div style="flex:1; min-width:260px;">
+              <span class="badge">Low fees • Fast execution</span>
+              <h1>Buy, sell, and manage stocks with confidence</h1>
+              <p>Institutional-grade tools with a retail-friendly experience. Your portfolio, your edge.</p>
+              <div class="hero-cta">
+                <a href="register.html" class="button positive"><i class="fa fa-user-plus"></i> Create free account</a>
+                <a href="trade.html" class="button ghost"><i class="fa fa-line-chart"></i> Start trading</a>
+              </div>
+              <!-- slim stats strip -->
+              <div class="strip">
+                <div class="stat">
+                  <div class="k">0.00%</div>
+                  <div class="v">Account opening fee</div>
+                </div>
+                <div class="stat">
+                  <div class="k">Instant</div>
+                  <div class="v">Portfolio updates</div>
+                </div>
+                <div class="stat">
+                  <div class="k">24/7</div>
+                  <div class="v">Orders & funding</div>
+                </div>
+                <div class="stat">
+                  <div class="k">Secure</div>
+                  <div class="v">Encrypted & audited</div>
+                </div>
+              </div>
+            </div>
 
-          <label>Email</label>
-          <input v-model.trim="loginForm.email" type="email" placeholder="you@example.com" required>
-
-          <label>Password</label>
-          <input v-model="loginForm.password" type="password" placeholder="Password" required>
-
-          <button class="button positive" :disabled="authLoading" @click="doLogin" style="margin-top:12px">
-            <i class="fa" :class="authLoading ? 'fa-spinner' : 'fa-sign-in'"></i>
-            {{ authLoading ? 'Logging in…' : 'Login' }}
-          </button>
-
-          <p class="muted" style="margin-top:10px">No account?
-            <a href="#" @click.prevent="changePage('register')">Register</a>
-          </p>
-
-          <p v-if="authError" class="error">{{ authError }}</p>
-        </div>
-      </section>
-
-      <!-- REGISTER PAGE -->
-      <section id="register" v-if="page === 'register'">
-        <div class="content auth card">
-          <h1>Register</h1>
-
-          <label>Full Name</label>
-          <input v-model.trim="regForm.fullName" type="text" required>
-
-          <label>Email</label>
-          <input v-model.trim="regForm.email" type="email" required>
-
-          <label>Password</label>
-          <input v-model="regForm.password" type="password" required>
-
-          <label>Confirm Password</label>
-          <input v-model="regForm.confirm" type="password" required>
-
-          <button class="button positive" :disabled="authLoading" @click="doRegister" style="margin-top:12px">
-            <i class="fa" :class="authLoading ? 'fa-spinner' : 'fa-user-plus'"></i>
-            {{ authLoading ? 'Creating…' : 'Create Account' }}
-          </button>
-
-          <p class="muted" style="margin-top:10px">Already have an account?
-            <a href="#" @click.prevent="changePage('login')">Login</a>
-          </p>
-
-          <p v-if="authError" class="error">{{ authError }}</p>
-        </div>
-      </section>
-
-      <!-- HOME (POST-LOGIN) -->
-      <section id="home" v-if="page === 'home'">
-        <div class="content">
-          <div class="card">
-            <h1>Welcome<span v-if="profileName">, {{ profileName }}</span>!</h1>
-            <p class="muted">You are logged in. This is your starting dashboard. Replace this with your User Hub / Portfolio.</p>
-            <div style="margin-top:12px">
-              <button class="button" @click="goTo('trade')"><i class="fa fa-line-chart"></i> Go to Trade</button>
-              <button class="button" @click="goTo('cash')" style="margin-left:8px"><i class="fa fa-money"></i> Go to Cash</button>
+            <div style="flex:1; min-width:280px;">
+              <div class="card" style="background:rgba(255,255,255,0.06); color:#fff;">
+                <h3 style="margin-top:0">Market preview</h3>
+                <div class="market-grid" id="mk-grid">
+                  <!-- filled by script -->
             </div>
           </div>
         </div>
-      </section>
+      </div>
+    </section>
 
-      <!-- PLACEHOLDER PAGES -->
-      <section id="trade" v-if="page === 'trade'">
-        <div class="content">
+    <!-- TRUST / BENEFITS -->
+    <section class="section">
+      <div class="content">
+        <div class="features">
           <div class="card">
-            <h2>Trade</h2>
-            <p class="muted">Placeholder. Build your Trade & Transaction UI here.</p>
+            <h3><i class="fa fa-lock"></i> Security first</h3>
+            <p class="muted">2FA ready, encrypted credentials, and role-based controls.</p>
+          </div>
+          <div class="card">
+            <h3><i class="fa fa-bolt"></i> Lightning execution</h3>
+            <p class="muted">Snappy order routing and instant portfolio updates.</p>
+          </div>
+          <div class="card">
+            <h3><i class="fa fa-sliders"></i> Pro tools, simple UI</h3>
+            <p class="muted">Watchlists, order types, and analytics without the clutter.</p>
+          </div>
+          <div class="card">
+            <h3><i class="fa fa-life-ring"></i> Human support</h3>
+            <p class="muted">Clear docs and responsive help when you need it.</p>
           </div>
         </div>
-      </section>
+      </div>
+    </section>
 
-      <section id="cash" v-if="page === 'cash'">
-        <div class="content">
-          <div class="card">
-            <h2>Cash Management</h2>
-            <p class="muted">Placeholder. Build your deposit/withdraw UI here.</p>
+    <!-- CALL TO ACTION BAND -->
+    <section class="section">
+      <div class="content">
+        <div class="cta-band">
+          <div>
+            <h2 style="margin:0;">Ready to get started?</h2>
+            <p class="muted" style="margin:6px 0 0;">Create an account in minutes and place your first trade today.</p>
+          </div>
+          <div>
+            <a href="register.html" class="button positive"><i class="fa fa-user-plus"></i> Create account</a>
+            <a href="login.html" class="button" style="margin-left:8px;"><i class="fa fa-sign-in"></i> Login</a>
           </div>
         </div>
-      </section>
-    </main>
+      </div>
+    </section>
+  </main>
 
-    <footer class="content" style="padding-bottom:32px;">
-      <p class="muted">© 2025 Stock App</p>
-    </footer>
-  </div>
+  <footer class="content" style="padding-bottom:32px;">
+    <p class="muted">© 2025 MCM Stocks</p>
+  </footer>
+<script>
+  // Highlight the active nav link
+  document.addEventListener("DOMContentLoaded", () => {
+    const links = document.querySelectorAll("nav a");
+    const currentPage = window.location.pathname.split("/").pop();
 
-  <script type="text/javascript">
-    const { createApp } = Vue;
-
-    createApp({
-      data() {
-        return {
-          menu: [
-            { id: 'home', caption: 'Home' },
-            { id: 'trade', caption: 'Trade' },
-            { id: 'cash', caption: 'Cash' }
-          ],
-          page: 'login',
-
-          // Auth/UI state
-          authLoading: false,
-          authError: '',
-
-          // Simplified login uses email + password
-          loginForm: { email: '', password: '' },
-
-          // Simplified register uses fullName + email + password (+ confirm on UI only)
-          regForm: { fullName: '', email: '', password: '', confirm: '' },
-
-          // Optional profile display
-          profileName: ''
-        };
-      },
-
-      computed: {
-        hasToken() {
-          const t = localStorage.getItem('auth.token') || '';
-          return !!t;
-        }
-      },
-
-      methods: {
-        changePage(next) {
-          const protectedPages = ['home', 'trade', 'cash'];
-          if (protectedPages.includes(next) && !this.hasToken) {
-            this.page = 'login';
-            return;
-          }
-          this.page = next;
-          localStorage.setItem('lastPage', this.page);
-        },
-
-        goTo(id) {
-          this.changePage(id);
-        },
-
-        async doLogin() {
-          this.authError = '';
-
-          if (!this.loginForm.email || !this.loginForm.password) {
-            this.authError = 'Email and password are required.';
-            return;
-          }
-
-          // very light email sanity (frontend only)
-          const basicEmailRx = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-          if (!basicEmailRx.test(this.loginForm.email)) {
-            this.authError = 'Please enter a valid email address.';
-            return;
-          }
-
-          this.authLoading = true;
-          try {
-            // Expect AuthAPI.login({ email, password }) to POST /api/users/login
-            const r = await AuthAPI.login({
-              email: this.loginForm.email,
-              password: this.loginForm.password
-            });
-            this.authLoading = false;
-
-            if (!r.ok || !r.token) {
-              this.authError = (r.data && r.data.message) || 'Login failed';
-              return;
-            }
-
-            const user = r?.data?.user || {};
-            const displayName = user.fullName || user.username || this.loginForm.email;
-
-            AuthAPI.storeAuth({
-              token: r.token,
-              email: this.loginForm.email,
-              user
-            });
-
-            this.profileName = displayName;
-            this.changePage('home');
-          } catch (err) {
-            this.authLoading = false;
-            this.authError = err?.message || 'Login error';
-          }
-        },
-
-        async doRegister() {
-          this.authError = '';
-
-          if (!this.regForm.fullName || !this.regForm.email || !this.regForm.password) {
-            this.authError = 'Please fill all required fields.';
-            return;
-          }
-
-          const basicEmailRx = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-          if (!basicEmailRx.test(this.regForm.email)) {
-            this.authError = 'Please enter a valid email address.';
-            return;
-          }
-
-          if (this.regForm.password !== this.regForm.confirm) {
-            this.authError = 'Passwords do not match.';
-            return;
-          }
-
-          this.authLoading = true;
-          try {
-            // Expect AuthAPI.register({ fullName, email, password }) to POST /api/users/register
-            const r = await AuthAPI.register({
-              fullName: this.regForm.fullName,
-              email: this.regForm.email,
-              password: this.regForm.password
-            });
-            this.authLoading = false;
-
-            if (!r.ok) {
-              this.authError = (r.data && r.data.message) || 'Registration failed';
-              return;
-            }
-
-            // After registration → go to Login and prefill email
-            this.changePage('login');
-            this.loginForm.email = this.regForm.email;
-          } catch (err) {
-            this.authLoading = false;
-            this.authError = err?.message || 'Registration error';
-          }
-        },
-
-        logout() {
-          AuthAPI.clearAuth();
-          this.profileName = '';
-          this.changePage('login');
-        }
-      },
-
-      mounted() {
-        // Restore last page if already logged in
-        const last = localStorage.getItem('lastPage') || 'home';
-        const { token, user, email } = AuthAPI.loadAuth ? (AuthAPI.loadAuth() || {}) : {};
-        if (token) {
-          this.profileName = (user && (user.fullName || user.username)) || email || '';
-          this.page = last;
-        } else {
-          this.page = 'login';
-        }
+    links.forEach(link => {
+      if (link.getAttribute("href") === currentPage) {
+        link.classList.add("active");
+      } else {
+        link.classList.remove("active");
       }
-    }).mount('#app');
+    });
+  });
+</script>
+  <script>
+    // Mini market preview (client-side mock; replace with live data later)
+    (function () {
+      const sample = [
+        { s: "AAPL", name: "Apple", price: 225.42, chg: +1.24 },
+        { s: "NVDA", name: "NVIDIA", price: 122.12, chg: -0.82 },
+        { s: "TSLA", name: "Tesla", price: 258.33, chg: +2.31 },
+        { s: "MSFT", name: "Microsoft", price: 426.71, chg: +0.15 },
+        { s: "AMZN", name: "Amazon", price: 188.06, chg: -1.12 },
+        { s: "META", name: "Meta", price: 526.44, chg: +0.67 }
+      ];
+      const grid = document.getElementById("mk-grid");
+      if (!grid) return;
+      sample.forEach(t => {
+        const card = document.createElement("div");
+        card.className = "card ticker-card";
+        card.onclick = () => location.href = "trade.html";
+        card.innerHTML = `
+          <div class="row">
+            <div>
+              <div class="sym">${t.s}</div>
+              <div class="muted" style="font-size:12px">${t.name}</div>
+            </div>
+            <div style="text-align:right">
+              <div class="price">$${t.price.toFixed(2)}</div>
+              <div class="chg ${t.chg >= 0 ? 'ok' : 'bad'}">${t.chg >= 0 ? '+' : ''}${t.chg.toFixed(2)}%</div>
+            </div>
+          </div>
+        `;
+        grid.appendChild(card);
+      });
+    })();
   </script>
 </body>
 </html>
