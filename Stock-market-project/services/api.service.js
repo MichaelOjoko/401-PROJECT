@@ -1,6 +1,8 @@
 "use strict";
 
 const ApiGateway = require("moleculer-web");
+const jwt = require("jsonwebtoken");
+const JWT_SECRET = "dev_secret_change_me";
 
 /**
  * @typedef {import('moleculer').ServiceSchema} ServiceSchema Moleculer's Service Schema
@@ -56,11 +58,17 @@ module.exports = {
 
 					// ========== Stock Management ==========
 					"POST /stocks": "core-logic.createStock",
-					"GET /stocks/:id": "core-logic.getStock",
-					"PUT /stocks/:id": "core-logic.updateStock",
-					"DELETE /stocks/:id": "core-logic.deleteStock",
 
-					// ========== Market Endpoints ==========
+					// ========== Accounts (Cash Management) ==========
+					"POST /accounts/users/deposit": "core-logic.depositCash",
+					"POST /accounts/users/withdraw": "core-logic.withdrawCash",
+					"GET /accounts/users/portfolio": "core-logic.getPortfolio",
+
+					// ========== Orders ==========
+					"POST /orders/place": "core-logic.placeOrder",
+					"DELETE /orders/cancel": "core-logic.cancelOrder",
+
+					// NOT DONE ========== Admin Market Endpoints ==========
 					"GET /market/market-open": "core-logic.isMarketOpen",
 					"GET /market/schedule": "core-logic.getMarketSchedule",
 					"PUT /market/schedule": "core-logic.updateMarketSchedule",
@@ -68,10 +76,6 @@ module.exports = {
 					"POST /market/holidays": "core-logic.addHoliday",
 					"DELETE /market/holidays/:holiday_date": "core-logic.deleteHoliday",
 					"DELETE /market/holidays": "core-logic.deleteAllHolidays",
-
-					// ========== User Balance ==========
-					"GET /user-balances/:userId": "core-logic.getUserBalance",
-					"PUT /user-balances/:userId": "core-logic.updateUserBalance",
 				},
 
 				/**
@@ -129,10 +133,12 @@ module.exports = {
 
 		// Serve assets from "public" folder. More info: https://moleculer.services/docs/0.14/moleculer-web.html#Serve-static-files
 		assets: {
-			folder: "public",
+			folder: "./public",
 
 			// Options to `server-static` module
-			options: {}
+			// options: {
+			// 	index: false
+			// }
 		}
 	},
 
@@ -151,28 +157,22 @@ module.exports = {
 		 * @returns {Promise}
 		 */
 		async authenticate(ctx, route, req) {
-			// Read the token from header
-			const auth = req.headers["authorization"];
-
-			if (auth && auth.startsWith("Bearer")) {
-				const token = auth.slice(7);
-
-				// Check the token. Tip: call a service which verify the token. E.g. `accounts.resolveToken`
-				if (token == "123456") {
-					// Returns the resolved user. It will be set to the `ctx.meta.user`
-					return { id: 1, name: "John Doe" };
-
-				} else {
-					// Invalid token
-					throw new ApiGateway.Errors.UnAuthorizedError(ApiGateway.Errors.ERR_INVALID_TOKEN);
-				}
-
-			} else {
-				// No token. Throw an error or do nothing if anonymous access is allowed.
-				// throw new E.UnAuthorizedError(E.ERR_NO_TOKEN);
-				return null;
+		const auth = req.headers["authorization"];
+		if (auth && auth.startsWith("Bearer")) {
+			const token = auth.slice(7);
+			try {
+			const payload = jwt.verify(token, JWT_SECRET);
+			// Return an object to be set on ctx.meta.user
+			return { id: payload.id, email: payload.email, role: payload.role };
+			} catch (err) {
+			// Invalid / expired token
+			throw new ApiGateway.Errors.UnAuthorizedError(ApiGateway.Errors.ERR_INVALID_TOKEN);
 			}
+		}
+		// No token present -> anonymous access (or throw if you want strict)
+		return null;
 		},
+
 
 		/**
 		 * Authorize the request. Check that the authenticated user has right to access the resource.
