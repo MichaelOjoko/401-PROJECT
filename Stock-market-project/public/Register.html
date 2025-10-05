@@ -117,6 +117,7 @@
         });
 
         if (!r.ok) {
+          print(r.data)
           errorEl.textContent = (r.data && r.data.message) || "Registration failed.";
           return;
         }
