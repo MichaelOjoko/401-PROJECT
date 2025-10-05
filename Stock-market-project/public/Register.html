@@ -34,14 +34,8 @@
         <label>Full Name</label>
         <input id="reg-fullname" type="text" required />
 
-        <label>Username</label>
-        <input id="reg-username" type="text" required />
-
         <label>Email</label>
         <input id="reg-email" type="email" required />
-
-        <label>Phone Number</label>
-        <input id="reg-phone" type="tel" required />
 
         <label>Password</label>
         <input id="reg-password" type="password" required />
@@ -117,7 +111,6 @@
         });
 
         if (!r.ok) {
-          print(r.data)
           errorEl.textContent = (r.data && r.data.message) || "Registration failed.";
           return;
         }
