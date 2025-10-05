@@ -94,7 +94,7 @@
       }
 
       try {
-        // Call backend via AuthAPI (served by main.js)
+        // Call backend via AuthAPI (served by auth.service.js)
         const r = await AuthAPI.register({ fullName, email, password });
 
         if (!r.ok) {
