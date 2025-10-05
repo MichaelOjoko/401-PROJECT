@@ -13,7 +13,7 @@
   <link rel="stylesheet" href="./main.css" />
 
   <!-- Auth service -->
-  <script src="./auth.service.js"></script>
+  <script src="./main.js"></script>
 </head>
 <body>
   <!-- Header / Nav -->
@@ -94,7 +94,7 @@
       }
 
       try {
-        // Call backend via AuthAPI (served by auth.service.js)
+        // Call backend via AuthAPI (served by main.js)
         const r = await AuthAPI.register({ fullName, email, password });
 
         if (!r.ok) {
