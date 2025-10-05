@@ -2,8 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport"
-        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, minimal-ui" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, minimal-ui" />
   <title>MCM Stocks — Register</title>
 
   <!-- Fonts / Icons -->
@@ -38,16 +37,10 @@
         <h1>Register</h1>
 
         <label>Full Name</label>
-        <input id="reg-fullname" type="text" required placeholder="e.g., Jane Doe" />
-
-        <label>Username</label>
-        <input id="reg-username" type="text" required placeholder="e.g., janedoe" />
+        <input id="reg-fullname" type="text" required />
 
         <label>Email</label>
-        <input id="reg-email" type="email" required placeholder="you@example.com" />
-
-        <label>Phone Number</label>
-        <input id="reg-phone" type="tel" required placeholder="+1 555 123 4567" />
+        <input id="reg-email" type="email" required />
 
         <label>Password</label>
         <input id="reg-password" type="password" required />
@@ -73,64 +66,43 @@
   </footer>
 
   <script>
-    function splitName(fullName) {
-      const parts = fullName.trim().split(/\s+/).filter(Boolean);
-      if (parts.length === 0) return { firstName: "", lastName: "" };
-      if (parts.length === 1) return { firstName: parts[0], lastName: "" };
-      const [firstName, ...rest] = parts;
-      return { firstName, lastName: rest.join(" ") };
-    }
-
-    function isValidEmail(email) {
-      const rx = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      return rx.test(email);
-    }
-
     async function doRegister() {
-      const fullName    = document.getElementById("reg-fullname").value.trim();
-      const username    = document.getElementById("reg-username").value.trim();
-      const email       = document.getElementById("reg-email").value.trim();
-      const phoneNumber = document.getElementById("reg-phone").value.trim();
-      const password    = document.getElementById("reg-password").value;
-      const confirm     = document.getElementById("reg-confirm").value;
-      const errorEl     = document.getElementById("reg-error");
+      const fullName = document.getElementById("reg-fullname").value.trim();
+      const email    = document.getElementById("reg-email").value.trim();
+      const password = document.getElementById("reg-password").value;
+      const confirm  = document.getElementById("reg-confirm").value;
+      const errorEl  = document.getElementById("reg-error");
 
       errorEl.textContent = "";
 
-      // Required fields
-      if (!fullName || !username || !email || !phoneNumber || !password || !confirm) {
+      // Basic validation for required fields
+      if (!fullName || !email || !password) {
         errorEl.textContent = "Please fill all required fields.";
         return;
       }
-      if (!isValidEmail(email)) {
+
+      // Very light email sanity check (frontend only)
+      const basicEmailRx = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!basicEmailRx.test(email)) {
         errorEl.textContent = "Please enter a valid email address.";
         return;
       }
+
       if (password !== confirm) {
         errorEl.textContent = "Passwords do not match.";
         return;
       }
 
-      const { firstName, lastName } = splitName(fullName);
-
       try {
-        // Ensure auth.service.js posts to /api/users/register with JSON
-        const resp = await AuthAPI.register({
-          username,
-          password,
-          firstName,
-          lastName,
-          email,
-          phoneNumber
-        });
+        // Call backend via AuthAPI (served by auth.service.js)
+        const r = await AuthAPI.register({ fullName, email, password });
 
-        if (!resp.ok) {
-          const msg = (resp.data && resp.data.message) || "Registration failed.";
-          errorEl.textContent = msg;
+        if (!r.ok) {
+          errorEl.textContent = (r.data && r.data.message) || "Registration failed.";
           return;
         }
 
-        // Success → go to login
+        // On success → go to login
         window.location.href = "login.html";
       } catch (err) {
         errorEl.textContent = err?.message || "Registration error.";
