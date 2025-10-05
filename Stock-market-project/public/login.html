@@ -42,9 +42,6 @@
         <label>Password</label>
         <input id="login-password" type="password" placeholder="Password" required />
 
-        <label>Tenant (optional)</label>
-        <input id="login-tenant" type="text" placeholder="Tenant" />
-
         <button class="button positive" onclick="doLogin()" style="margin-top:12px">
           <i class="fa fa-sign-in"></i> Login
         </button>
@@ -65,11 +62,11 @@
 <!-- public/auth.service.js -->
 <script>
 const AuthAPI = {
-  async login({ username, password, tenant }) {
+  async login({ username, password }) {
     const res = await fetch("/api/users/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username, password, tenant })
+      body: JSON.stringify({ username, password, })
     });
 
     const data = await res.json().catch(() => ({}));
@@ -82,11 +79,11 @@ const AuthAPI = {
     };
   },
 
-  async register({ username, password, email, tenant }) {
+  async register({ username, password, email }) {
     const res = await fetch("/api/users/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username, password, email, tenant })
+      body: JSON.stringify({ username, password, email })
     });
     return { ok: res.ok, data: await res.json().catch(() => ({})) };
   }
