@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>MCM Stocks — Trade History</title>
+
+  <!-- Fonts -->
+  <link href="https://fonts.googleapis.com/css?family=Source+Sans+Pro:300,400,600,700" rel="stylesheet" />
+
+  <!-- App CSS + Auth helper -->
+  <link rel="stylesheet" href="./main.css" />
+  <script src="./main.js"></script>
+
+  <style>
+    /* Page-local polish only; uses your palette */
+    .tbl { width:100%; border-collapse: collapse; }
+    .tbl th, .tbl td { padding:10px; border-bottom:1px solid var(--gray); text-align:left; }
+    .tbl th { font-weight:700; color: rgba(0,0,0,.7); }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
+
+    /* Optional status chips */
+    .chip { border:1px solid var(--gray); border-radius:999px; padding:4px 10px; font-size:12px; display:inline-block; }
+    .chip.ok { border-color:#1b7f32; color:#1b7f32; background:rgba(27,127,50,.08); }
+    .chip.wait { border-color:#a37b00; color:#a37b00; background:rgba(163,123,0,.08); }
+  </style>
+</head>
+<body>
+  <!-- Header / Nav (auth-aware) -->
+  <header>
+    <div style="font-weight:700">MCM Stocks</div>
+    <nav>
+      <ul>
+        <li><a href="index.html" data-top="index.html">Home</a></li>
+        <li><a href="trade.html" data-top="trade.html">Trade</a></li>
+        <li><a href="cash.html" data-top="cash.html">Cash</a></li>
+
+        <!-- Auth toggle targets -->
+        <li id="nav-login"><a href="login.html" data-top="login.html">Login</a></li>
+        <li id="nav-register"><a href="register.html" data-top="register.html">Register</a></li>
+        <li id="nav-logout" style="display:none;"><a href="#" onclick="logoutUser()">Logout</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <main class="dashboard">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="group">
+        <div class="group-title">Main</div>
+        <ul>
+          <li><a href="dashboard.html" data-route="dashboard.html">Overview</a></li>
+          <li><a href="portfolio.html" data-route="portfolio.html">Portfolio</a></li>
+          <li><a href="trade.html" data-route="trade.html">Trading</a></li>
+          <li><a href="cash.html" data-route="cash.html">Cash</a></li>
+        </ul>
+      </div>
+      <div class="group">
+        <div class="group-title">Activity</div>
+        <ul>
+          <li><a href="tradehistory.html" class="active" data-route="tradehistory.html">Trade History</a></li>
+          <li><a href="profile.html" data-route="profile.html">Profile</a></li>
+          <li><a href="settings.html" data-route="settings.html">Settings</a></li>
+        </ul>
+      </div>
+      <div class="group">
+        <div class="group-title">Quick</div>
+        <ul>
+          <li><a href="trade.html?sell=1" data-route="trade.html">Sell Stock</a></li>
+          <li><a href="portfolio.html" data-route="portfolio.html">View Portfolio</a></li>
+          <li><a href="research.html" data-route="research.html">Market Research</a></li>
+        </ul>
+      </div>
+    </aside>
+
+    <!-- Content -->
+    <section>
+      <div class="card">
+        <h1 style="margin-top:0;">Trade History</h1>
+        <p class="muted">Completed and pending trades.</p>
+        <table class="tbl" style="margin-top:12px;">
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Side</th>
+              <th>Symbol</th>
+              <th>Qty</th>
+              <th>Type</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="hist-body"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <footer class="content"><p class="muted">© 2025 MCM Stocks</p></footer>
+
+  <script>
+    // ===== Require auth (enable to protect page) =====
+    (function guard(){
+      const { token } = (window.AuthAPI && AuthAPI.loadAuth && AuthAPI.loadAuth()) || { token:'' };
+      if (!token) location.replace('login.html');
+    })();
+
+    // ===== Highlight active links (top & sidebar) =====
+    (function highlight(){
+      const p = location.pathname.split('/').pop() || 'tradehistory.html';
+      document.querySelectorAll('.sidebar a[data-route]').forEach(a =>
+        a.classList.toggle('active', a.getAttribute('data-route') === p)
+      );
+      document.querySelectorAll('header nav a[data-top]').forEach(a =>
+        a.classList.toggle('active', a.getAttribute('data-top') === p)
+      );
+    })();
+
+    // ===== Auth-aware top nav toggle =====
+    document.addEventListener("DOMContentLoaded", () => {
+      const loggedIn = !!(window.AuthAPI && AuthAPI.isAuthenticated && AuthAPI.isAuthenticated());
+      const logoutItem = document.getElementById("nav-logout");
+      const loginItem  = document.getElementById("nav-login");
+      const regItem    = document.getElementById("nav-register");
+
+      if (loggedIn) {
+        if (logoutItem) logoutItem.style.display = "inline-block";
+        if (loginItem)  loginItem.style.display  = "none";
+        if (regItem)    regItem.style.display    = "none";
+      } else {
+        if (logoutItem) logoutItem.style.display = "none";
+        if (loginItem)  loginItem.style.display  = "inline-block";
+        if (regItem)    regItem.style.display    = "inline-block";
+      }
+    });
+
+    // ===== Demo rows (replace with API) =====
+    const rows = [
+      {time:'2025-09-24 14:22', side:'BUY',  sym:'AAPL', qty:50, type:'Market', status:'Filled'},
+      {time:'2025-09-24 11:10', side:'SELL', sym:'TSLA', qty:10, type:'Limit',  status:'Submitted'}
+    ];
+    const tb = document.getElementById('hist-body');
+    rows.forEach(r=>{
+      const tr=document.createElement('tr');
+      const chipClass = r.status === 'Filled' ? 'chip ok' : 'chip wait';
+      tr.innerHTML =
+        `<td>${r.time}</td>
+         <td>${r.side}</td>
+         <td class="mono">${r.sym}</td>
+         <td>${r.qty}</td>
+         <td>${r.type}</td>
+         <td><span class="${chipClass}">${r.status}</span></td>`;
+      tb.appendChild(tr);
+    });
+  </script>
+</body>
+</html>

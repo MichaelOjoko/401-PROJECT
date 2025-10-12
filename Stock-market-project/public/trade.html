@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MCM Stocks — Trade</title>
+  <link href="https://fonts.googleapis.com/css?family=Source+Sans+Pro:300,400,600,700" rel="stylesheet" />
+  <link rel="stylesheet" href="./main.css" />
+  <script src="./main.js"></script>
+</head>
+<body>
+  <!-- Header -->
+  <header>
+    <div style="font-weight:700">MCM Stocks</div>
+    <nav>
+      <ul>
+        <li><a href="index.html" data-top="index.html">Home</a></li>
+        <li><a href="trade.html" data-top="trade.html">Trade</a></li>
+        <li><a href="cash.html" data-top="cash.html">Cash</a></li>
+
+        <!-- Auth-aware nav items -->
+        <li id="nav-login"><a href="login.html" data-top="login.html">Login</a></li>
+        <li id="nav-register"><a href="register.html" data-top="register.html">Register</a></li>
+        <li id="nav-logout" style="display:none;"><a href="#" onclick="logoutUser()">Logout</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <main class="dashboard">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="group">
+        <div class="group-title">Main</div>
+        <ul>
+          <li><a href="dashboard.html" data-route="index.html">Overview</a></li>
+          <li><a href="portfolio.html" data-route="portfolio.html">Portfolio</a></li>
+          <li><a href="trade.html" class="active" data-route="trade.html">Trading</a></li>
+          <li><a href="cash.html" data-route="cash.html">Cash</a></li>
+        </ul>
+      </div>
+      <div class="group">
+        <div class="group-title">Activity</div>
+        <ul>
+          <!-- filename normalized -->
+          <li><a href="tradehistory.html" data-route="tradehistory.html">Trade History</a></li>
+          <li><a href="profile.html" data-route="profile.html">Profile</a></li>
+          <li><a href="settings.html" data-route="settings.html">Settings</a></li>
+        </ul>
+      </div>
+      <div class="group">
+        <div class="group-title">Quick</div>
+        <ul>
+          <li><a href="trade.html?sell=1" data-route="trade.html">Sell Stock</a></li>
+          <li><a href="portfolio.html" data-route="portfolio.html">View Portfolio</a></li>
+          <li><a href="research.html" data-route="research.html">Market Research</a></li>
+        </ul>
+      </div>
+    </aside>
+
+    <!-- Page Content -->
+    <section class="content">
+      <div class="card">
+        <h1 style="margin-top:0;">Trade Stocks</h1>
+        <p class="muted">Initiate a buy or sell transaction below.</p>
+
+        <form id="trade-form" class="auth" style="margin-top:20px;">
+          <label for="ticker">Stock Ticker</label>
+          <input type="text" id="ticker" placeholder="e.g. AAPL" required />
+
+          <label for="quantity">Quantity</label>
+          <input type="number" id="quantity" placeholder="Enter number of shares" required />
+
+          <label for="action">Action</label>
+          <select id="action" required>
+            <option value="">Select Action</option>
+            <option value="buy">Buy</option>
+            <option value="sell">Sell</option>
+          </select>
+
+          <label for="price">Price per Share (USD)</label>
+          <input type="number" id="price" step="0.01" placeholder="Enter price" required />
+
+          <button type="submit" class="button positive" style="margin-top:14px;">
+            Submit Trade
+          </button>
+        </form>
+
+        <p id="trade-msg" class="muted" style="margin-top:10px;"></p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="content">
+    <p class="muted">© 2025 MCM Stocks</p>
+  </footer>
+
+  <script>
+    // Require auth
+    (function guard(){
+      const { token } = (window.AuthAPI && AuthAPI.loadAuth()) || { token:'' };
+      if (!token) location.replace('login.html');
+    })();
+
+    // Highlight active links
+    (function highlight(){
+      const p = location.pathname.split('/').pop() || 'trade.html';
+      document.querySelectorAll('.sidebar a[data-route]').forEach(a =>
+        a.classList.toggle('active', a.getAttribute('data-route') === p)
+      );
+      document.querySelectorAll('header nav a[data-top]').forEach(a =>
+        a.classList.toggle('active', a.getAttribute('data-top') === p)
+      );
+    })();
+
+    // Trade form handler (demo); replace with real API when ready
+    const form = document.getElementById("trade-form");
+    const msg  = (t)=>{ const el=document.getElementById('trade-msg'); if (el) el.textContent=t; };
+
+    form.addEventListener("submit", async function(e) {
+      e.preventDefault();
+      const ticker = document.getElementById("ticker").value.trim().toUpperCase();
+      const qty    = Number(document.getElementById("quantity").value);
+      const action = document.getElementById("action").value;
+      const price  = Number(document.getElementById("price").value);
+
+      if (!ticker || !qty || !action || !price) {
+        msg("Please fill all required fields.");
+        return;
+      }
+
+      // Demo UX
+      msg(`Submitting ${action.toUpperCase()} ${qty} ${ticker} @ $${price.toFixed(2)}…`);
+
+      // Example secured call using your AuthAPI (uncomment & adjust endpoint when backend ready)
+      /*
+      const res = await AuthAPI.fetch('/api/trades', {
+        method: 'POST',
+        body: JSON.stringify({ ticker, quantity: qty, action, price })
+      });
+      if (!res.ok) {
+        msg(res?.data?.message || 'Trade failed.');
+        return;
+      }
+      msg('Trade submitted successfully.');
+      */
+
+      // Demo fallback
+      setTimeout(() => {
+        msg(`Trade Submitted: ${action.toUpperCase()} ${qty} shares of ${ticker} @ $${price.toFixed(2)} (demo)`);
+      }, 250);
+    });
+  </script>
+
+  <!-- Auth-aware nav toggle -->
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const loggedIn = !!(window.AuthAPI && AuthAPI.isAuthenticated && AuthAPI.isAuthenticated());
+      const logoutItem = document.getElementById("nav-logout");
+      const loginItem  = document.getElementById("nav-login");
+      const regItem    = document.getElementById("nav-register");
+
+      if (loggedIn) {
+        if (logoutItem) logoutItem.style.display = "inline-block";
+        if (loginItem)  loginItem.style.display  = "none";
+        if (regItem)    regItem.style.display    = "none";
+      } else {
+        if (logoutItem) logoutItem.style.display = "none";
+        if (loginItem)  loginItem.style.display  = "inline-block";
+        if (regItem)    regItem.style.display    = "inline-block";
+      }
+    });
+  </script>
+</body>
+</html>

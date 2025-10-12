@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>MCM Stocks — Profile</title>
+
+  <!-- Fonts / Icons -->
+  <link href="https://fonts.googleapis.com/css?family=Source+Sans+Pro:300,400,600,700" rel="stylesheet" />
+
+  <!-- App styles & Auth helper -->
+  <link rel="stylesheet" href="./main.css" />
+  <script src="./main.js"></script>
+</head>
+<body>
+  <!-- Header / Nav (auth-aware) -->
+  <header>
+    <div style="font-weight:700">MCM Stocks</div>
+    <nav>
+      <ul>
+        <li><a href="index.html" data-top="index.html">Home</a></li>
+        <li><a href="trade.html" data-top="trade.html">Trade</a></li>
+        <li><a href="cash.html" data-top="cash.html">Cash</a></li>
+        <li id="nav-login"><a href="login.html" data-top="login.html">Login</a></li>
+        <li id="nav-register"><a href="register.html" data-top="register.html">Register</a></li>
+        <li id="nav-logout" style="display:none;"><a href="#" onclick="logoutUser()">Logout</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <main class="dashboard">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="group">
+        <div class="group-title">Main</div>
+        <ul>
+          <li><a href="dashboard.html" data-route="dashboard.html">Overview</a></li>
+          <li><a href="portfolio.html" data-route="portfolio.html">Portfolio</a></li>
+          <li><a href="trade.html" data-route="trade.html">Trading</a></li>
+          <li><a href="cash.html" data-route="cash.html">Cash</a></li>
+        </ul>
+      </div>
+      <div class="group">
+        <div class="group-title">Activity</div>
+        <ul>
+          <li><a href="tradehistory.html" data-route="tradehistory.html">Trade History</a></li>
+          <li><a href="profile.html" class="active" data-route="profile.html">Profile</a></li>
+          <li><a href="settings.html" data-route="settings.html">Settings</a></li>
+        </ul>
+      </div>
+      <div class="group">
+        <div class="group-title">Quick</div>
+        <ul>
+          <li><a href="trade.html?sell=1" data-route="trade.html">Sell Stock</a></li>
+          <li><a href="portfolio.html" data-route="portfolio.html">View Portfolio</a></li>
+          <li><a href="research.html" data-route="research.html">Market Research</a></li>
+        </ul>
+      </div>
+    </aside>
+
+    <!-- Content -->
+    <section>
+      <div class="card">
+        <h1 style="margin-top:0;">Profile</h1>
+        <p class="muted">Update your personal details. (We won’t sell your email. Pinky promise.)</p>
+
+        <div class="content" style="padding:0; max-width:560px;">
+          <label>Display Name</label>
+          <input type="text" id="p_name" placeholder="Your name" />
+
+          <label style="margin-top:10px;">Email</label>
+          <input type="email" id="p_email" placeholder="you@example.com" />
+
+          <label style="margin-top:10px;">Phone</label>
+          <input type="tel" id="p_phone" placeholder="+1 555 123 4567" />
+
+          <button class="button positive" style="margin-top:14px;" id="btnSave">Save</button>
+          <p class="muted" id="saveMsg" style="margin-top:8px;"></p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="content"><p class="muted">© 2025 MCM Stocks</p></footer>
+
+  <script>
+    // ===== Require auth (enable to protect page) =====
+    (function guard(){
+      const { token } = (window.AuthAPI && AuthAPI.loadAuth && AuthAPI.loadAuth()) || { token:'' };
+      if (!token) location.replace('login.html');
+    })();
+
+    // ===== Highlight active links (top & sidebar) =====
+    (function highlight(){
+      const p = location.pathname.split('/').pop() || 'profile.html';
+      document.querySelectorAll('.sidebar a[data-route]').forEach(a => {
+        a.classList.toggle('active', a.getAttribute('data-route') === p);
+      });
+      document.querySelectorAll('header nav a[data-top]').forEach(a => {
+        a.classList.toggle('active', a.getAttribute('data-top') === p);
+      });
+    })();
+
+    // ===== Auth-aware top nav toggle =====
+    document.addEventListener("DOMContentLoaded", () => {
+      const loggedIn = !!(window.AuthAPI && AuthAPI.isAuthenticated && AuthAPI.isAuthenticated());
+      const logoutItem = document.getElementById("nav-logout");
+      const loginItem  = document.getElementById("nav-login");
+      const regItem    = document.getElementById("nav-register");
+
+      if (loggedIn) {
+        if (logoutItem) logoutItem.style.display = "inline-block";
+        if (loginItem)  loginItem.style.display  = "none";
+        if (regItem)    regItem.style.display    = "none";
+      } else {
+        if (logoutItem) logoutItem.style.display = "none";
+        if (loginItem)  loginItem.style.display  = "inline-block";
+        if (regItem)    regItem.style.display    = "inline-block";
+      }
+    });
+
+    // ===== Prefill from AuthAPI (local only, no backend yet) =====
+    (function prefill(){
+      const { email, name } = (window.AuthAPI && AuthAPI.loadAuth && AuthAPI.loadAuth()) || {};
+      if (name)  document.getElementById('p_name').value  = name;
+      if (email) document.getElementById('p_email').value = email;
+      // phone is not stored in auth yet; left empty
+    })();
+
+    // ===== Save (demo; replace with real API when ready) =====
+    document.getElementById('btnSave').addEventListener('click', async ()=>{
+      const payload = {
+        name:  document.getElementById('p_name').value.trim(),
+        email: document.getElementById('p_email').value.trim(),
+        phone: document.getElementById('p_phone').value.trim()
+      };
+
+      // Example of a secured PUT when you have a backend route:
+      // const res = await AuthAPI.fetch('/api/users/profile', {
+      //   method: 'PUT',
+      //   body: JSON.stringify(payload)
+      // });
+      // if (!res.ok) { show('Failed to save'); return; }
+
+      // For now: persist display name locally so it shows across pages
+      const auth = (AuthAPI.loadAuth && AuthAPI.loadAuth()) || {};
+      AuthAPI.storeAuth({
+        token:  auth.token || '',
+        tenant: auth.tenant || '',
+        email:  payload.email || auth.email || '',
+        name:   payload.name || auth.name || ''
+      });
+
+      show('Profile saved locally. (Wire to backend when ready.)');
+    });
+
+    function show(msg){
+      const el = document.getElementById('saveMsg');
+      if (!el) return;
+      el.textContent = msg;
+      setTimeout(()=> el.textContent = '', 2000);
+    }
+  </script>
+</body>
+</html>

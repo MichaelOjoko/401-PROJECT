@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,minimal-ui" />
+  <title>MCM Stocks — Dashboard</title>
+
+  <link href="https://fonts.googleapis.com/css?family=Source+Sans+Pro:300,400,600,700" rel="stylesheet" />
+  <link href="https://unpkg.com/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet" />
+  <link rel="stylesheet" href="./main.css" />
+  <!-- AuthAPI + logoutUser -->
+  <script src="./main.js"></script>
+
+  <style>
+    /* Page-specific refinements that follow your palette */
+    .kpis { display:grid; grid-template-columns: repeat(3, 1fr); gap:12px; }
+    @media (max-width: 900px){ .kpis { grid-template-columns: 1fr; } }
+    .kpi { display:flex; align-items:center; justify-content:space-between; }
+    .kpi .lbl { color: #555; font-size: 13px; }
+    .kpi .val { font-weight:700; font-size: 22px; }
+    .grid-2 { display:grid; grid-template-columns: 1.2fr .8fr; gap:12px; }
+    @media (max-width: 1100px){ .grid-2 { grid-template-columns: 1fr; } }
+    .mini-table { width:100%; border-collapse:collapse; }
+    .mini-table th, .mini-table td { padding:10px; border-bottom:1px solid var(--gray); text-align:left; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
+    .pill { text-align:center; border:1px solid var(--gray); border-radius:999px; padding:3px 8px; display:inline-block; font-weight:600; }
+    .pill.pos { border-color:#1b7f32; color:#1b7f32; background: rgba(27,127,50,.08); }
+    .pill.neg { border-color:#b91c1c; color:#b91c1c; background: rgba(185,28,28,.08); }
+    .actions { display:flex; gap:8px; flex-wrap:wrap; }
+    .watchlist .row { display:flex; align-items:center; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--gray); }
+    .watchlist .row:last-child { border-bottom:none; }
+  </style>
+</head>
+<body>
+  <!-- Header / Nav (auth-aware) -->
+  <header>
+    <div style="font-weight:700">MCM Stocks</div>
+    <nav>
+      <ul>
+        <li><a href="index.html" data-top="index.html">Home</a></li>
+        <li><a href="trade.html" data-top="trade.html">Trade</a></li>
+        <li><a href="cash.html" data-top="cash.html">Cash</a></li>
+        <li id="nav-login"><a href="login.html" data-top="login.html">Login</a></li>
+        <li id="nav-register"><a href="register.html" data-top="register.html">Register</a></li>
+        <li id="nav-logout" style="display:none;"><a href="#" onclick="logoutUser()">Logout</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <main class="dashboard">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="group">
+        <div class="group-title">Main</div>
+        <ul>
+          <li><a href="dashboard.html" class="active" data-route="dashboard.html">Overview</a></li>
+          <li><a href="portfolio.html" data-route="portfolio.html">Portfolio</a></li>
+          <li><a href="trade.html" data-route="trade.html">Trading</a></li>
+          <li><a href="cash.html" data-route="cash.html">Cash</a></li>
+        </ul>
+      </div>
+      <div class="group">
+        <div class="group-title">Activity</div>
+        <ul>
+          <li><a href="tradehistory.html" data-route="tradehistory.html">Trade History</a></li>
+          <li><a href="profile.html" data-route="profile.html">Profile</a></li>
+          <li><a href="settings.html" data-route="settings.html">Settings</a></li>
+        </ul>
+      </div>
+      <div class="group">
+        <div class="group-title">Quick</div>
+        <ul>
+          <li><a href="trade.html?sell=1" data-route="trade.html">Sell Stock</a></li>
+          <li><a href="portfolio.html" data-route="portfolio.html">View Portfolio</a></li>
+          <li><a href="research.html" data-route="research.html">Market Research</a></li>
+        </ul>
+      </div>
+    </aside>
+
+    <!-- Content -->
+    <section class="content">
+      <div class="card">
+        <h1 style="margin-top:0;">Welcome, <span id="dash-name">Investor</span></h1>
+        <p class="muted">Your consolidated account overview.</p>
+
+        <!-- KPIs -->
+        <div class="kpis" style="margin-top:10px;">
+          <div class="card kpi">
+            <div>
+              <div class="lbl">Cash Balance</div>
+              <div class="val" id="kpi-balance">$0.00</div>
+            </div>
+            <button class="button positive" onclick="location.href='cash.html'"><i class="fa fa-plus-circle"></i> Add funds</button>
+          </div>
+          <div class="card kpi">
+            <div>
+              <div class="lbl">Holdings (Positions)</div>
+              <div class="val" id="kpi-positions">0</div>
+            </div>
+            <button class="button" onclick="location.href='portfolio.html'"><i class="fa fa-briefcase"></i> View portfolio</button>
+          </div>
+          <div class="card kpi">
+            <div>
+              <div class="lbl">Day P&amp;L</div>
+              <div class="val" id="kpi-pl"><span class="pill">—</span></div>
+            </div>
+            <button class="button" onclick="location.href='trade.html'"><i class="fa fa-line-chart"></i> Place trade</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid-2" style="margin-top:12px;">
+        <!-- Left column -->
+        <div class="card">
+          <div style="display:flex; align-items:center; justify-content:space-between;">
+            <h2 style="margin:0;">Positions Snapshot</h2>
+            <div class="actions">
+              <button class="button" onclick="location.href='portfolio.html'"><i class="fa fa-briefcase"></i> Full portfolio</button>
+              <button class="button positive" onclick="location.href='trade.html'"><i class="fa fa-plus"></i> New order</button>
+            </div>
+          </div>
+          <table class="mini-table" style="margin-top:10px;">
+            <thead>
+              <tr>
+                <th>Ticker</th><th>Company</th><th>Qty</th><th>Avg Cost</th><th>Last</th><th>Day %</th><th>Unrealized</th>
+              </tr>
+            </thead>
+            <tbody id="pos-rows"></tbody>
+          </table>
+        </div>
+
+        <!-- Right column -->
+        <div class="card">
+          <h2 style="margin-top:0;">Watchlist</h2>
+          <div class="watchlist" id="watchlist">
+            <!-- rows injected -->
+          </div>
+          <div style="margin-top:12px;">
+            <button class="button" onclick="location.href='research.html'"><i class="fa fa-search"></i> Research</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:12px;">
+        <h2 style="margin-top:0;">Recent Activity</h2>
+        <table class="mini-table" style="margin-top:10px;">
+          <thead><tr><th>When</th><th>Type</th><th>Details</th><th>Status</th></tr></thead>
+          <tbody id="activity-rows"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <footer class="content" style="padding-bottom:32px;">
+    <p class="muted">© 2025 MCM Stocks</p>
+  </footer>
+
+  <script>
+    // ===== Auth guard =====
+    (function guard(){
+      const { token } = (window.AuthAPI && AuthAPI.loadAuth && AuthAPI.loadAuth()) || { token:'' };
+      if (!token) location.replace('login.html');
+    })();
+
+    // ===== Active link highlight =====
+    (function highlight(){
+      const p = location.pathname.split('/').pop() || 'dashboard.html';
+      document.querySelectorAll('.sidebar a[data-route]').forEach(a =>
+        a.classList.toggle('active', a.getAttribute('data-route') === p)
+      );
+      document.querySelectorAll('header nav a[data-top]').forEach(a =>
+        a.classList.toggle('active', a.getAttribute('data-top') === p)
+      );
+    })();
+
+    // ===== Auth-aware top nav toggle =====
+    document.addEventListener("DOMContentLoaded", () => {
+      const loggedIn = !!(window.AuthAPI && AuthAPI.isAuthenticated && AuthAPI.isAuthenticated());
+      const logoutItem = document.getElementById("nav-logout");
+      const loginItem  = document.getElementById("nav-login");
+      const regItem    = document.getElementById("nav-register");
+
+      if (loggedIn) {
+        if (logoutItem) logoutItem.style.display = "inline-block";
+        if (loginItem)  loginItem.style.display  = "none";
+        if (regItem)    regItem.style.display    = "none";
+      } else {
+        if (logoutItem) logoutItem.style.display = "none";
+        if (loginItem)  loginItem.style.display  = "inline-block";
+        if (regItem)    regItem.style.display    = "inline-block";
+      }
+    });
+
+    // ===== Dashboard data loading =====
+    (async function loadDashboard(){
+      // Load profile name from AuthAPI local storage
+      const auth = (window.AuthAPI && AuthAPI.loadAuth && AuthAPI.loadAuth()) || {};
+      const displayName = auth.name || auth.email || 'Investor';
+      const userId = (auth.user && auth.user.id) || (auth.data && auth.data.user && auth.data.user.id) || null;
+      document.getElementById('dash-name').textContent = displayName;
+
+      // Try to load balance via your Moleculer alias: GET /user-balances/:userId
+      let balance = 0;
+      try {
+        if (userId && AuthAPI.fetch) {
+          const res = await AuthAPI.fetch(`/api/user-balances/${encodeURIComponent(userId)}`, { method: 'GET' });
+          if (res.ok && res.data) {
+            // Normalize likely shapes
+            balance = res.data.balance ?? res.data.cash ?? 0;
+          }
+        }
+      } catch(_) { /* fallback to 0 */ }
+      document.getElementById('kpi-balance').textContent = `$${Number(balance).toFixed(2)}`;
+
+      // Positions (demo until wired)
+      const positions = [
+        { t:'AAPL', n:'Apple Inc.', qty:120, avg:182.50, last:186.20, day:+1.2, pl:+444 },
+        { t:'MSFT', n:'Microsoft', qty:55,  avg:398.10, last:395.05, day:-0.6, pl:-167 },
+        { t:'TSLA', n:'Tesla',     qty:20,  avg:255.00, last:260.30, day:+2.1, pl:+106 }
+      ];
+      const posBody = document.getElementById('pos-rows');
+      posBody.innerHTML = '';
+      positions.forEach(r=>{
+        const pill = r.day>=0 ? 'pill pos' : 'pill neg';
+        const sign = r.day>=0 ? '+' : '';
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td class="mono">${r.t}</td>
+          <td>${r.n}</td>
+          <td>${r.qty}</td>
+          <td>$${r.avg.toFixed(2)}</td>
+          <td>$${r.last.toFixed(2)}</td>
+          <td><span class="${pill}">${sign}${r.day}%</span></td>
+          <td><span class="${r.pl>=0?'pill pos':'pill neg'}">$${r.pl}</span></td>
+        `;
+        posBody.appendChild(tr);
+      });
+      document.getElementById('kpi-positions').textContent = positions.length;
+      // Simple day P&L aggregate (demo)
+      const dayPl = positions.reduce((acc,r)=> acc + (r.pl||0), 0);
+      document.getElementById('kpi-pl').innerHTML =
+        `<span class="pill ${dayPl>=0?'pos':'neg'}">${dayPl>=0?'+':''}$${dayPl.toFixed(0)}</span>`;
+
+      // Watchlist (demo)
+      const watch = [
+        { s:'NVDA', name:'NVIDIA',    last: 122.12, chg: -0.82 },
+        { s:'AMZN', name:'Amazon',    last: 188.06, chg: -1.12 },
+        { s:'META', name:'Meta',      last: 526.44, chg: +0.67 },
+        { s:'MSFT', name:'Microsoft', last: 426.71, chg: +0.15 }
+      ];
+      const wl = document.getElementById('watchlist');
+      wl.innerHTML = '';
+      watch.forEach(w=>{
+        const pill = w.chg>=0 ? 'pill pos' : 'pill neg';
+        const sign = w.chg>=0 ? '+' : '';
+        const row = document.createElement('div');
+        row.className = 'row';
+        row.innerHTML = `
+          <div>
+            <div class="mono">${w.s}</div>
+            <div class="muted" style="font-size:12px">${w.name}</div>
+          </div>
+          <div style="text-align:right">
+            <div class="mono">$${w.last.toFixed(2)}</div>
+            <div><span class="${pill}">${sign}${w.chg}%</span></div>
+          </div>
+        `;
+        row.onclick = ()=> location.href='trade.html';
+        wl.appendChild(row);
+      });
+
+      // Recent activity (demo)
+      const acts = [
+        { when:'Today 10:24', type:'Order', details:'BUY 10 AAPL @ MKT', status:'Filled' },
+        { when:'Yesterday',   type:'Deposit', details:'$200.00 from ****1234', status:'Completed' },
+        { when:'2d ago',      type:'Order', details:'SELL 3 TSLA @ 260.00', status:'Filled' }
+      ];
+      const ab = document.getElementById('activity-rows');
+      ab.innerHTML = '';
+      acts.forEach(a=>{
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${a.when}</td>
+          <td>${a.type}</td>
+          <td>${a.details}</td>
+          <td><span class="pill">${a.status}</span></td>
+        `;
+        ab.appendChild(tr);
+      });
+    })();
+  </script>
+</body>
+</html>

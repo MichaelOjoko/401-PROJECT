@@ -15,17 +15,19 @@
   <!-- Global styles -->
   <link rel="stylesheet" href="./main.css" />
 
-  <!-- Minimal page tweaks that respect your color scheme -->
+  <!-- Auth + helpers (provides AuthAPI + logoutUser) -->
+  <script src="./main.js"></script>
+
+  <!-- Page-specific polish that respects your palette -->
   <style>
-    /* Tries to inherit your palette; falls back safely if vars not present */
     :root {
-      --hero-bg: var(--page-hero, #0b0e11);
-      --hero-fg: var(--page-hero-fg, #ffffff);
-      --accent: var(--brand, #f0c330);
-      --muted-fg: var(--muted, #8b8b8b);
-      --ok: var(--positive, #16c784);
-      --bad: var(--negative, #ea3943);
-      --card-bg-soft: var(--panel, rgba(255,255,255,0.04));
+      --hero-bg: var(--navy, #14213D);
+      --hero-fg: var(--white, #ffffff);
+      --accent: var(--gold, #FCA311);
+      --muted-fg: #8b8b8b;
+      --ok: #16c784;
+      --bad: #ea3943;
+      --card-bg-soft: rgba(255,255,255,0.06);
     }
     .hero {
       background: var(--hero-bg);
@@ -72,7 +74,6 @@
       gap: 12px;
     }
     .badge { font-size: 12px; font-weight: 700; color: #111; background: var(--accent); padding: 4px 8px; border-radius: 999px; }
-
     .cta-band {
       background: var(--card-bg-soft);
       border-radius: 14px;
@@ -82,7 +83,7 @@
   </style>
 </head>
 <body>
-  <!-- Header / Nav -->
+  <!-- Header / Nav (auth-aware) -->
   <header>
     <div style="font-weight:700">MCM Stocks</div>
     <nav>
@@ -90,14 +91,15 @@
         <li><a href="index.html" data-top="index.html">Home</a></li>
         <li><a href="trade.html" data-top="trade.html">Trade</a></li>
         <li><a href="cash.html" data-top="cash.html">Cash</a></li>
-        <li><a href="login.html" data-top="login.html">Login</a></li>
-        <li><a href="register.html" data-top="register.html">Register</a></li>
+        <li id="nav-login"><a href="login.html" data-top="login.html">Login</a></li>
+        <li id="nav-register"><a href="register.html" data-top="register.html">Register</a></li>
+        <li id="nav-logout" style="display:none;"><a href="#" onclick="logoutUser()">Logout</a></li>
       </ul>
     </nav>
   </header>
 
   <main>
-    <!-- HERO (Binance style: dark hero + CTA + compact strip) -->
+    <!-- HERO -->
     <section class="hero">
       <div class="content">
         <div class="card" style="background:transparent; box-shadow:none;">
@@ -110,32 +112,21 @@
                 <a href="register.html" class="button positive"><i class="fa fa-user-plus"></i> Create free account</a>
                 <a href="trade.html" class="button ghost"><i class="fa fa-line-chart"></i> Start trading</a>
               </div>
-              <!-- slim stats strip -->
+
+              <!-- Slim stats strip -->
               <div class="strip">
-                <div class="stat">
-                  <div class="k">0.00%</div>
-                  <div class="v">Account opening fee</div>
-                </div>
-                <div class="stat">
-                  <div class="k">Instant</div>
-                  <div class="v">Portfolio updates</div>
-                </div>
-                <div class="stat">
-                  <div class="k">24/7</div>
-                  <div class="v">Orders & funding</div>
-                </div>
-                <div class="stat">
-                  <div class="k">Secure</div>
-                  <div class="v">Encrypted & audited</div>
-                </div>
+                <div class="stat"><div class="k">0.00%</div><div class="v">Account opening fee</div></div>
+                <div class="stat"><div class="k">Instant</div><div class="v">Portfolio updates</div></div>
+                <div class="stat"><div class="k">24/7</div><div class="v">Orders &amp; funding</div></div>
+                <div class="stat"><div class="k">Secure</div><div class="v">Encrypted &amp; audited</div></div>
               </div>
             </div>
 
             <div style="flex:1; min-width:280px;">
               <div class="card" style="background:rgba(255,255,255,0.06); color:#fff;">
                 <h3 style="margin-top:0">Market preview</h3>
-                <div class="market-grid" id="mk-grid">
-                  <!-- filled by script -->
+                <div class="market-grid" id="mk-grid"><!-- filled by script --></div>
+              </div>
             </div>
           </div>
         </div>
@@ -186,31 +177,47 @@
   <footer class="content" style="padding-bottom:32px;">
     <p class="muted">© 2025 MCM Stocks</p>
   </footer>
-<script>
-  // Highlight the active nav link
-  document.addEventListener("DOMContentLoaded", () => {
-    const links = document.querySelectorAll("nav a");
-    const currentPage = window.location.pathname.split("/").pop();
 
-    links.forEach(link => {
-      if (link.getAttribute("href") === currentPage) {
-        link.classList.add("active");
+  <!-- Active nav highlight -->
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const page = location.pathname.split("/").pop() || "index.html";
+      document.querySelectorAll('header nav a[data-top]').forEach(a =>
+        a.classList.toggle('active', a.getAttribute('data-top') === page)
+      );
+    });
+  </script>
+
+  <!-- Auth-aware nav toggle -->
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const loggedIn = !!(window.AuthAPI && AuthAPI.isAuthenticated && AuthAPI.isAuthenticated());
+      const logoutItem = document.getElementById("nav-logout");
+      const loginItem  = document.getElementById("nav-login");
+      const regItem    = document.getElementById("nav-register");
+
+      if (loggedIn) {
+        if (logoutItem) logoutItem.style.display = "inline-block";
+        if (loginItem)  loginItem.style.display  = "none";
+        if (regItem)    regItem.style.display    = "none";
       } else {
-        link.classList.remove("active");
+        if (logoutItem) logoutItem.style.display = "none";
+        if (loginItem)  loginItem.style.display  = "inline-block";
+        if (regItem)    regItem.style.display    = "inline-block";
       }
     });
-  });
-</script>
+  </script>
+
+  <!-- Mini market preview (client-side mock; replace with live data later) -->
   <script>
-    // Mini market preview (client-side mock; replace with live data later)
     (function () {
       const sample = [
-        { s: "AAPL", name: "Apple", price: 225.42, chg: +1.24 },
-        { s: "NVDA", name: "NVIDIA", price: 122.12, chg: -0.82 },
-        { s: "TSLA", name: "Tesla", price: 258.33, chg: +2.31 },
+        { s: "AAPL", name: "Apple",     price: 225.42, chg: +1.24 },
+        { s: "NVDA", name: "NVIDIA",    price: 122.12, chg: -0.82 },
+        { s: "TSLA", name: "Tesla",     price: 258.33, chg: +2.31 },
         { s: "MSFT", name: "Microsoft", price: 426.71, chg: +0.15 },
-        { s: "AMZN", name: "Amazon", price: 188.06, chg: -1.12 },
-        { s: "META", name: "Meta", price: 526.44, chg: +0.67 }
+        { s: "AMZN", name: "Amazon",    price: 188.06, chg: -1.12 },
+        { s: "META", name: "Meta",      price: 526.44, chg: +0.67 }
       ];
       const grid = document.getElementById("mk-grid");
       if (!grid) return;

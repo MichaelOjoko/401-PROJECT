@@ -1,8 +1,8 @@
 // services/auth.service.js
-// Lightweight auth helper for MCM Stock App (Vue via CDN)
+// Lightweight auth helper for MCM Stock App (vanilla / Vue via CDN)
 // - Same-origin by default (API_BASE = '')
 // - Endpoints match Moleculer-Web aliases in api.service.js
-// - Exposes `window.AuthAPI`
+// - Exposes `window.AuthAPI` and a global `logoutUser()`
 
 ;(function () {
   // =================
@@ -50,13 +50,11 @@
   // =================
   // STORAGE
   // =================
-  function storeAuth({ token, tenant, email, name, user }) {
+  function storeAuth({ token, tenant, email, name }) {
     if (token != null)  localStorage.setItem(LS_KEYS.token, token);
     if (tenant != null) localStorage.setItem(LS_KEYS.tenant, tenant);
     if (email != null)  localStorage.setItem(LS_KEYS.email, email);
     if (name != null)   localStorage.setItem(LS_KEYS.name, name);
-
-    // Optional: broadcast change
     try { window.dispatchEvent(new CustomEvent("auth:changed", { detail: loadAuth() })); } catch (_) {}
   }
 
@@ -88,7 +86,7 @@
     const { token, tenant } = loadAuth();
     const hdrs = { "Content-Type": "application/json", ...extra };
     if (token)  hdrs.Authorization = `Bearer ${token}`;
-    if (tenant) hdrs["x-tenant"] = tenant; // keep if you use tenants
+    if (tenant) hdrs["x-tenant"]   = tenant; // keep if you use tenants
     return hdrs;
   }
 
@@ -131,7 +129,6 @@
    * Returns: { ok, status, data }
    */
   async function register(payload) {
-    // Expect backend to validate & return 201 + { id, fullName, email } on success
     return postJson(ENDPOINTS.register, {
       fullName: payload.fullName,
       email:    payload.email,
@@ -140,27 +137,34 @@
   }
 
   /**
-   * Login with email + password.
-   * payload: { email, password, tenant? }
+   * Login with email OR username + password.
+   * payload: { email, password, tenant? }   // the UI field is called "email" but may contain a username
    * Returns: { ok, status, data, token, tenant }
    */
   async function login(payload) {
+    const id = (payload.email || "").trim();
+    const looksLikeEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(id);
+
     const result = await postJson(ENDPOINTS.login, {
-      email:    payload.email,
       password: payload.password,
+      ...(looksLikeEmail ? { email: id } : { username: id }),
       tenant:   payload.tenant || undefined
     }, false);
 
-    if (result.ok && result.token) {
-      const user = result?.data?.user || {};
+    // Accept token whether in headers, body, or nested
+    const token = result.token || result?.data?.token || "";
+    const user  = result?.data?.user || {};
+    const success = result.ok && (token || result?.data?.success === true);
+
+    if (success) {
       storeAuth({
-        token:  result.token,
+        token,
         tenant: result.tenant || payload.tenant || "",
-        email:  payload.email,
+        email:  user.email || (looksLikeEmail ? id : ""),
         name:   user.fullName || user.username || ""
       });
     }
-    return result;
+    return { ...result, token };
   }
 
   /**
@@ -194,5 +198,11 @@
     login,
     me,
     fetch: fetchAuth
+  };
+
+  // Global logout helper (use in nav: <a id="logout-link" href="#">Logout</a>)
+  window.logoutUser = function () {
+    try { clearAuth(); } catch (_){}
+    window.location.href = "login.html";
   };
 })();

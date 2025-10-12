@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>MCM Stocks — Portfolio</title>
+  <link href="https://fonts.googleapis.com/css?family=Source+Sans+Pro:300,400,600,700" rel="stylesheet" />
+  <link rel="stylesheet" href="./main.css" />
+  <script src="./main.js"></script>
+  <!-- (Optional) remove this inline style; main.css already has .tbl/.pill/mono -->
+  <style>
+    .tbl { width:100%; border-collapse: collapse; }
+    .tbl th, .tbl td { padding:10px; border-bottom:1px solid var(--gray); text-align:left; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
+  </style>
+</head>
+<body>
+  <header>
+    <div style="font-weight:700">MCM Stocks</div>
+    <nav>
+      <ul>
+        <li><a href="index.html" data-top="index.html">Home</a></li>
+        <li><a href="trade.html" data-top="trade.html">Trade</a></li>
+        <li><a href="cash.html" data-top="cash.html">Cash</a></li>
+
+        <!-- IDs for auth toggle -->
+        <li id="nav-login"><a href="login.html" data-top="login.html">Login</a></li>
+        <li id="nav-register"><a href="register.html" data-top="register.html">Register</a></li>
+        <li id="nav-logout" style="display:none;"><a href="#" onclick="logoutUser()">Logout</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <main class="dashboard">
+    <aside class="sidebar">
+      <div class="group">
+        <div class="group-title">Main</div>
+        <ul>
+          <li><a href="dashboard.html" data-route="index.html">Overview</a></li>
+          <li><a href="portfolio.html" class="active" data-route="portfolio.html">Portfolio</a></li>
+          <li><a href="trade.html" data-route="trade.html">Trading</a></li>
+          <li><a href="cash.html" data-route="cash.html">Cash</a></li>
+        </ul>
+      </div>
+      <div class="group">
+        <div class="group-title">Activity</div>
+        <ul>
+          <li><a href="tradehistory.html" data-route="tradehistory.html">Trade History</a></li>
+          <li><a href="profile.html" data-route="profile.html">Profile</a></li>
+          <li><a href="settings.html" data-route="settings.html">Settings</a></li>
+        </ul>
+      </div>
+      <div class="group">
+        <div class="group-title">Quick</div>
+        <ul>
+          <li><a href="trade.html?sell=1" data-route="trade.html">Sell Stock</a></li>
+          <li><a href="portfolio.html" data-route="portfolio.html">View Portfolio</a></li>
+          <li><a href="research.html" data-route="research.html">Market Research</a></li>
+        </ul>
+      </div>
+    </aside>
+
+    <!-- ✅ Add class="content" so dashboard layout applies -->
+    <section class="content">
+      <div class="card">
+        <h1 style="margin-top:0;">Portfolio</h1>
+        <p class="muted">Your holdings, allocations, and P&amp;L.</p>
+        <table class="tbl" style="margin-top:12px;">
+          <thead>
+            <tr>
+              <th>Ticker</th><th>Company</th><th>Qty</th><th>Avg Cost</th><th>Last Price</th><th>Day %</th><th>Unrealized P&amp;L</th>
+            </tr>
+          </thead>
+          <tbody id="pf-rows"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <footer class="content"><p class="muted">© 2025 MCM Stocks</p></footer>
+
+  <script>
+    // Require auth
+    (function guard(){
+      const { token } = (window.AuthAPI && AuthAPI.loadAuth()) || { token:'' };
+      if (!token) location.replace('login.html');
+    })();
+
+    // Highlight active links
+    (function highlight(){
+      const p = location.pathname.split('/').pop() || 'portfolio.html';
+      document.querySelectorAll('.sidebar a[data-route]').forEach(a =>
+        a.classList.toggle('active', a.getAttribute('data-route') === p)
+      );
+      document.querySelectorAll('header nav a[data-top]').forEach(a =>
+        a.classList.toggle('active', a.getAttribute('data-top') === p)
+      );
+    })();
+
+    // demo data (replace with API)
+    const data = [
+      { t:'AAPL', n:'Apple Inc.', qty:120, avg:182.50, last:186.20, day:+1.2, pl:+444 },
+      { t:'MSFT', n:'Microsoft',  qty:55,  avg:398.10, last:395.05, day:-0.6, pl:-167 },
+      { t:'TSLA', n:'Tesla',      qty:20,  avg:255.00, last:260.30, day:+2.1, pl:+106 }
+    ];
+    const tb = document.getElementById('pf-rows');
+    data.forEach(r=>{
+      const tr = document.createElement('tr');
+      const dayClass = r.day >= 0 ? 'pill pos' : 'pill neg';
+      const daySign  = r.day >= 0 ? '+' : '';
+      const plClass  = r.pl  >= 0 ? 'pill pos' : 'pill neg';
+      const plSign   = r.pl  >= 0 ? '' : '-';
+
+      tr.innerHTML =
+        `<td class="mono">${r.t}</td>
+         <td>${r.n}</td>
+         <td>${r.qty}</td>
+         <td>$${r.avg.toFixed(2)}</td>
+         <td>$${r.last.toFixed(2)}</td>
+         <td><span class="${dayClass}">${daySign}${r.day}%</span></td>
+         <td><span class="${plClass}">${plSign}$${Math.abs(r.pl)}</span></td>`;
+      tb.appendChild(tr);
+    });
+  </script>
+
+  <!-- Show Login/Register vs Logout -->
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const loggedIn = !!(window.AuthAPI && AuthAPI.isAuthenticated && AuthAPI.isAuthenticated());
+      const logoutItem = document.getElementById("nav-logout");
+      const loginItem  = document.getElementById("nav-login");
+      const regItem    = document.getElementById("nav-register");
+
+      if (loggedIn) {
+        if (logoutItem) logoutItem.style.display = "inline-block";
+        if (loginItem)  loginItem.style.display  = "none";
+        if (regItem)    regItem.style.display    = "none";
+      } else {
+        if (logoutItem) logoutItem.style.display = "none";
+        if (loginItem)  loginItem.style.display  = "inline-block";
+        if (regItem)    regItem.style.display    = "inline-block";
+      }
+    });
+  </script>
+</body>
+</html>

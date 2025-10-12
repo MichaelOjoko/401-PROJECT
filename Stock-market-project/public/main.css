@@ -9,9 +9,13 @@
   --gold: #FCA311;
   --gray: #E5E5E5;
   --white: #FFFFFF;
+
+  --muted: #616b74;
 }
 
 /* General */
+* { box-sizing: border-box; }
+
 body {
   margin: 0;
   font-family: "Source Sans Pro", system-ui, -apple-system, Segoe UI, Roboto, Arial;
@@ -41,20 +45,19 @@ nav ul {
   list-style: none;
   display: flex;
   gap: 16px;
+  align-items: center;
 }
 
-nav li {
-  border-radius: 6px;
-}
+nav li { border-radius: 6px; }
 
-/* 👇 New link styles */
+/* Top nav links */
 nav a {
   display: block;
   padding: 6px 10px;
   color: var(--white);
   text-decoration: none;
   border-radius: 6px;
-  transition: 0.2s;
+  transition: background .2s ease, color .2s ease;
 }
 
 nav a:hover,
@@ -96,33 +99,29 @@ nav a.active {
   border-radius: 6px;
   cursor: pointer;
   font-weight: 600;
-  transition: 0.2s;
+  transition: background .2s ease, transform .02s ease;
 }
+
+.button:active { transform: translateY(1px); }
 
 .button.positive {
   background: var(--gold);
   color: var(--black);
 }
 
-.button.positive:hover {
-  background: #e59400; /* darker gold */
-}
+.button.positive:hover { background: #e59400; } /* darker gold */
 
 /* Utilities */
-.muted {
-  color: #555;
-}
-
-.error {
-  color: #b91c1c;
-  margin-top: 10px;
-}
+.muted { color: var(--muted); }
+.error { color: #b91c1c; margin-top: 10px; }
+.hidden { display: none !important; }
 
 .card {
   background: var(--white);
   border: 1px solid var(--gray);
   border-radius: 8px;
   padding: 20px;
+  box-shadow: 0 1px 0 rgba(0,0,0,.02);
 }
 
 /* Footer */
@@ -134,3 +133,112 @@ footer {
   border-top: 3px solid var(--gold);
   margin-top: 40px;
 }
+
+/* ============================
+   DASHBOARD + SIDEBAR LAYOUT
+   ============================ */
+
+/* Two-column layout: sidebar + main content */
+main.dashboard {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 16px 0;
+}
+
+/* Sidebar look & behavior */
+.sidebar {
+  width: 260px;
+  position: sticky;       /* stays in view while scrolling */
+  top: 64px;              /* adjust if header height changes */
+  padding: 8px 8px 0;
+}
+
+.sidebar .group { margin-bottom: 14px; }
+
+.sidebar .group-title {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: rgba(0,0,0,.55);
+  margin: 6px 8px;
+}
+
+/* Remove bullets & tighten spacing */
+.sidebar ul { list-style: none; margin: 0; padding: 0; }
+.sidebar li { margin: 4px 0; }
+
+/* Sidebar links */
+.sidebar a {
+  display: block;
+  padding: 8px 10px;
+  border-radius: 10px;
+  text-decoration: none;
+  color: var(--black);
+  background: transparent;
+  transition: background .15s ease, color .15s ease, transform .05s ease;
+}
+
+.sidebar a:hover { background: rgba(20, 33, 61, .06); } /* navy tint */
+
+.sidebar a.active {
+  background: rgba(20, 33, 61, .12);
+  border-left: 3px solid var(--gold);
+  padding-left: 7px; /* compensate for border */
+  font-weight: 700;
+}
+
+/* Let the main content fill the remaining width */
+main.dashboard .content {
+  flex: 1;
+  max-width: none;   /* override .content’s 960px cap when inside dashboard */
+  width: 100%;
+  margin: 0;
+}
+
+/* Cards inside dashboard get a little extra separation */
+main.dashboard .card { margin-bottom: 12px; }
+
+/* Tables (Portfolio, etc.) */
+.tbl { width: 100%; border-collapse: collapse; }
+.tbl th, .tbl td {
+  padding: 10px;
+  border-bottom: 1px solid var(--gray);
+  text-align: left;
+}
+.tbl th { font-weight: 700; color: rgba(0,0,0,.7); }
+
+/* Chips used for Day% and P/L */
+.pill {
+  text-align: center;
+  border: 1px solid var(--gray);
+  border-radius: 999px;
+  padding: 4px 8px;
+  display: inline-block;
+  font-weight: 600;
+}
+.pill.pos { border-color: #1b7f32; color: #1b7f32; background: rgba(27,127,50,.08); }
+.pill.neg { border-color: #b91c1c; color: #b91c1c; background: rgba(185,28,28,.08); }
+.sidebar {
+  background: #f9fafc;
+  border-right: 1px solid #ddd;
+  padding: 16px;
+  height: calc(100vh - 64px);
+  overflow-y: auto;
+}
+.sidebar .group-title {
+  text-transform: uppercase;
+  font-size: 12px;
+  color: #777;
+  margin: 10px 0 4px;
+}
+.sidebar a.active {
+  background: var(--gold);
+  color: var(--black);
+  font-weight: 700;
+}
+.sidebar a:hover {
+  background: rgba(252, 163, 17, 0.15);
+}
+
