@@ -97,18 +97,23 @@
           return;
         }
 
-        // Persist token/etc. (main.js exposes storeAuth)
+        // Persist token + id + role + name + email (no tenant)
         if (AuthAPI.storeAuth) {
-          const user = (r.data && r.data.user) || {};
+          // Accept either { user: {...} } or a flat user payload
+          const user = (r.data && (r.data.user || r.data)) || {};
+          const id   = user.id   ?? user.userId ?? user._id ?? "";
+          const role = user.role ?? user.userRole ?? user.type ?? "";
+
           AuthAPI.storeAuth({
-            token:  r.token,
-            tenant: r.tenant || "",
+            token: r.token,
             email,
-            name:   user.fullName || user.username || ""
+            name:  user.fullName || user.username || "",
+            id,
+            role
           });
         }
 
-        // Success -> go home (or dashboard)
+        // Success -> go home (or change to your dashboard page if you prefer)
         window.location.href = "index.html";
       } catch (err) {
         errorEl.textContent = err?.message || "Login error.";

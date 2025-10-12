@@ -16,13 +16,19 @@
     me:       "/api/users/me"         // optional; keep if you implement it
   };
 
-  // localStorage keys
+  // =================
+  // LOCAL STORAGE KEYS
+  // =================
   const LS_KEYS = {
-    token:   "auth.token",
-    tenant:  "auth.tenant",
-    email:   "auth.email",
-    name:    "auth.name"
+    token: "auth.token",
+    email: "auth.email",
+    name:  "auth.name",
+    id:    "auth.id",
+    role:  "auth.role"
   };
+
+  // (one-time) migrate away from old tenant key if it exists
+  try { localStorage.removeItem("auth.tenant"); } catch (_) {}
 
   // =================
   // INTERNAL UTILS
@@ -50,28 +56,29 @@
   // =================
   // STORAGE
   // =================
-  function storeAuth({ token, tenant, email, name }) {
-    if (token != null)  localStorage.setItem(LS_KEYS.token, token);
-    if (tenant != null) localStorage.setItem(LS_KEYS.tenant, tenant);
-    if (email != null)  localStorage.setItem(LS_KEYS.email, email);
-    if (name != null)   localStorage.setItem(LS_KEYS.name, name);
+  function storeAuth({ token, email, name, id, role }) {
+    if (token != null) localStorage.setItem(LS_KEYS.token, token);
+    if (email != null) localStorage.setItem(LS_KEYS.email, email);
+    if (name  != null) localStorage.setItem(LS_KEYS.name,  name);
+    if (id    != null) localStorage.setItem(LS_KEYS.id,    String(id));
+    if (role  != null) localStorage.setItem(LS_KEYS.role,  role);
     try { window.dispatchEvent(new CustomEvent("auth:changed", { detail: loadAuth() })); } catch (_) {}
   }
 
   function clearAuth() {
-    localStorage.removeItem(LS_KEYS.token);
-    localStorage.removeItem(LS_KEYS.tenant);
-    localStorage.removeItem(LS_KEYS.email);
-    localStorage.removeItem(LS_KEYS.name);
+    Object.values(LS_KEYS).forEach(k => {
+      try { localStorage.removeItem(k); } catch (_) {}
+    });
     try { window.dispatchEvent(new CustomEvent("auth:changed", { detail: loadAuth() })); } catch (_) {}
   }
 
   function loadAuth() {
     return {
-      token:  localStorage.getItem(LS_KEYS.token)  || "",
-      tenant: localStorage.getItem(LS_KEYS.tenant) || "",
-      email:  localStorage.getItem(LS_KEYS.email)  || "",
-      name:   localStorage.getItem(LS_KEYS.name)   || ""
+      token: localStorage.getItem(LS_KEYS.token) || "",
+      email: localStorage.getItem(LS_KEYS.email) || "",
+      name:  localStorage.getItem(LS_KEYS.name)  || "",
+      id:    localStorage.getItem(LS_KEYS.id)    || "",
+      role:  localStorage.getItem(LS_KEYS.role)  || ""
     };
   }
 
@@ -83,23 +90,21 @@
   // REQUEST HELPERS
   // =================
   function authHeaders(extra = {}) {
-    const { token, tenant } = loadAuth();
+    const { token } = loadAuth();
     const hdrs = { "Content-Type": "application/json", ...extra };
-    if (token)  hdrs.Authorization = `Bearer ${token}`;
-    if (tenant) hdrs["x-tenant"]   = tenant; // keep if you use tenants
+    if (token) hdrs.Authorization = `Bearer ${token}`;
     return hdrs;
   }
 
+  // Normalize response
   function shape(res, data) {
-    // Token/tenant may come from body OR headers
-    const headerToken  = (res.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
-    const headerTenant = res.headers.get("x-tenant-id") || res.headers.get("x-tenant") || "";
+    // Token may come in headers or body
+    const headerToken = (res.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
     return {
       ok:     res.ok,
       status: res.status,
       data,
-      token:  data.token  || headerToken || "",
-      tenant: data.tenant || headerTenant || ""
+      token:  data.token || headerToken || ""
     };
   }
 
@@ -138,30 +143,30 @@
 
   /**
    * Login with email OR username + password.
-   * payload: { email, password, tenant? }   // the UI field is called "email" but may contain a username
-   * Returns: { ok, status, data, token, tenant }
+   * payload: { email, password } // UI uses "email" field but it may contain a username
+   * Returns: { ok, status, data, token }
    */
   async function login(payload) {
-    const id = (payload.email || "").trim();
-    const looksLikeEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(id);
+    const idStr = (payload.email || "").trim();
+    const looksLikeEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(idStr);
 
     const result = await postJson(ENDPOINTS.login, {
       password: payload.password,
-      ...(looksLikeEmail ? { email: id } : { username: id }),
-      tenant:   payload.tenant || undefined
+      ...(looksLikeEmail ? { email: idStr } : { username: idStr })
     }, false);
 
-    // Accept token whether in headers, body, or nested
+    // Token can be in header or body
     const token = result.token || result?.data?.token || "";
-    const user  = result?.data?.user || {};
+    const user  = result?.data?.user || result?.data || {};
     const success = result.ok && (token || result?.data?.success === true);
 
     if (success) {
       storeAuth({
         token,
-        tenant: result.tenant || payload.tenant || "",
-        email:  user.email || (looksLikeEmail ? id : ""),
-        name:   user.fullName || user.username || ""
+        email: user.email || (looksLikeEmail ? idStr : ""),
+        name:  user.fullName || user.username || "",
+        id:    user.id ?? user.userId ?? user._id ?? "",
+        role:  user.role ?? user.userRole ?? ""
       });
     }
     return { ...result, token };
@@ -200,7 +205,7 @@
     fetch: fetchAuth
   };
 
-  // Global logout helper (use in nav: <a id="logout-link" href="#">Logout</a>)
+  // Global logout helper (use in nav: <a onclick="logoutUser()" href="#">Logout</a>)
   window.logoutUser = function () {
     try { clearAuth(); } catch (_){}
     window.location.href = "login.html";
