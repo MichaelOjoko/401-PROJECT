@@ -45,29 +45,26 @@ module.exports = {
         password: "string"
       },
       async handler(ctx) {
-        // Verify credentials
+        // check DB
         const user = await this.verifyUser(ctx.params.email, ctx.params.password);
         if (!user) {
-          // Keep same shape as before but include success: false
+          // if no user is found :(
           return { success: false, message: "Invalid credentials" };
         }
 
-        // Build a small token payload (avoid putting secrets or heavy objects in token)
+        // give frontend user information
         const payload = {
           id: user.id,
           email: user.email,
           role: user.role
         };
 
-        // Sign JWT (expires in 2 hours)
+        // Sign JWT... not even used !!!!
         const token = jwt.sign(payload, JWT_SECRET, { expiresIn: "2h" });
 
-        // Return shape frontend expects: success, token, user
-        // Note: keep user fields minimal and non-sensitive
         return { success: true, token, user };
       }
     },
-
 
     // ====== STOCKS (Admin only) ======
     createStock: {
@@ -139,28 +136,40 @@ module.exports = {
     // ============ USERS ============
     async createUser({ email, passwordHash, fullName }) {
       // decide role
-      let roleQuery = `SELECT role_id FROM role WHERE name = 'customer'`;
+      let roleQuery = `SELECT role_id, name FROM role WHERE name = 'customer'`;
       if (email.endsWith("@asu.edu")) {
-        roleQuery = `SELECT role_id FROM role WHERE name = 'admin'`;
+        roleQuery = `SELECT role_id, name FROM role WHERE name = 'admin'`;
       }
-      const roleResult = await pool.query(roleQuery);
-      const roleId = roleResult.rows[0].role_id;
 
+      const roleResult = await pool.query(roleQuery);
+      const { role_id: roleId, name: roleName } = roleResult.rows[0];
+
+      // create user
       const query = `
         INSERT INTO app_user (email, password_hash, full_name, role_id)
         VALUES ($1, $2, $3, $4)
-        RETURNING user_id, email, full_name, role_id
+        RETURNING user_id, email, full_name
       `;
 
       const values = [email, passwordHash, fullName, roleId];
       const result = await pool.query(query, values);
 
-      return result.rows[0];
+      // attach role name for return
+      const user = result.rows[0];
+      user.role = roleName;
+
+      return user;
     },
 
 
+
     async verifyUser(email, password) {
-      const query = `SELECT * FROM app_user WHERE email=$1`;
+      const query = `
+        SELECT u.user_id, u.email, u.full_name, u.password_hash, r.name AS role_name
+        FROM app_user u
+        JOIN role r ON u.role_id = r.role_id
+        WHERE u.email = $1
+      `;
       const result = await pool.query(query, [email]);
       if (result.rows.length === 0) return null;
 
@@ -168,8 +177,14 @@ module.exports = {
       const match = await bcrypt.compare(password, user.password_hash);
       if (!match) return null;
 
-      return { id: user.user_id, email: user.email, fullName: user.full_name, role: user.role_id };
+      return {
+        id: user.user_id,
+        email: user.email,
+        fullName: user.full_name,
+        role: user.role_name  // now returns readable role
+      };
     },
+
 
     // ============ STOCKS ============
     async insertSymbol({ ticker, name, exchange, sector, currency, totalShares, initialPrice }) {
@@ -183,12 +198,17 @@ module.exports = {
 
     // ============ CASH ============
     async adjustCash(userId, amount, type) {
+      // Pull users account
       const accountRes = await pool.query(`SELECT account_id, cash_balance FROM account WHERE user_id=$1`, [userId]);
+      // if no account found error
       if (accountRes.rows.length === 0) throw new Error("Account not found");
       const account = accountRes.rows[0];
+
+      //works for both deposite and widthraw checks 
       const newBalance = Number(account.cash_balance) + Number(amount);
       if (newBalance < 0) throw new Error("Insufficient funds");
 
+      // update 
       await pool.query(`UPDATE account SET cash_balance=$1 WHERE account_id=$2`, [newBalance, account.account_id]);
       await pool.query(
         `INSERT INTO cash_txn (account_id, type, amount) VALUES ($1, $2, $3)`,
@@ -210,6 +230,13 @@ module.exports = {
       const result = await pool.query(query, [userId]);
       return result.rows;
     },
+
+
+
+
+
+
+
 
     // ============ ORDERS ============
     async placeOrder({ userId, symbol, side, quantity }) {

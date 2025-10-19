@@ -62,7 +62,7 @@ module.exports = {
 					// ========== Accounts (Cash Management) ==========
 					"POST /accounts/users/deposit": "core-logic.depositCash",
 					"POST /accounts/users/withdraw": "core-logic.withdrawCash",
-					"GET /accounts/users/portfolio": "core-logic.getPortfolio",
+					"GET portfolio": "core-logic.getPortfolio", //singal path enfoced on GET?
 
 					// ========== Orders ==========
 					"POST /orders/place": "core-logic.placeOrder",

@@ -34,7 +34,7 @@ CREATE TABLE app_user (
 -- ======================
 CREATE TABLE account (
     account_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID NOT NULL REFERENCES app_user(user_id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES app_user(user_id) ON DELETE CASCADE, --if user is deleted delete their accounts
     account_type TEXT CHECK (account_type IN ('cash')) NOT NULL DEFAULT 'cash',
     currency TEXT NOT NULL DEFAULT 'USD',
     cash_balance NUMERIC(18,4) DEFAULT 0,
