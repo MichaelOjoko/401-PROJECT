@@ -98,7 +98,6 @@
 
   // Normalize response
   function shape(res, data) {
-    // Token may come in headers or body
     const headerToken = (res.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
     return {
       ok:     res.ok,
@@ -127,12 +126,6 @@
   // =================
   // PUBLIC ACTIONS
   // =================
-
-  /**
-   * Register a new user.
-   * payload: { fullName, email, password }
-   * Returns: { ok, status, data }
-   */
   async function register(payload) {
     return postJson(ENDPOINTS.register, {
       fullName: payload.fullName,
@@ -141,11 +134,6 @@
     }, false);
   }
 
-  /**
-   * Login with email OR username + password.
-   * payload: { email, password } // UI uses "email" field but it may contain a username
-   * Returns: { ok, status, data, token }
-   */
   async function login(payload) {
     const idStr = (payload.email || "").trim();
     const looksLikeEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(idStr);
@@ -155,7 +143,6 @@
       ...(looksLikeEmail ? { email: idStr } : { username: idStr })
     }, false);
 
-    // Token can be in header or body
     const token = result.token || result?.data?.token || "";
     const user  = result?.data?.user || result?.data || {};
     const success = result.ok && (token || result?.data?.success === true);
@@ -172,16 +159,10 @@
     return { ...result, token };
   }
 
-  /**
-   * Optional: current-user profile (if you wire it up).
-   */
   async function me() {
     return getJson(ENDPOINTS.me, true);
   }
 
-  /**
-   * Authorized fetch helper.
-   */
   async function fetchAuth(path, options = {}) {
     const headers = authHeaders(options.headers || {});
     const { res, data } = await coreFetch(path, { ...options, headers });
@@ -189,7 +170,7 @@
   }
 
   // =================
-  // EXPORT
+  // EXPORT + ACCESS GUARDS
   // =================
   window.AuthAPI = {
     ENDPOINTS,
@@ -202,12 +183,25 @@
     register,
     login,
     me,
-    fetch: fetchAuth
+    fetch: fetchAuth,
+
+    // ACCESS GUARDS
+    requireLogin() {
+      const { token } = window.AuthAPI.loadAuth();
+      if (!token) window.location.replace("login.html");
+    },
+
+    requireAdmin() {
+      const auth = window.AuthAPI.loadAuth();
+      if (!auth.token) return window.location.replace("login.html");
+      const isAsuAdmin = (auth.email || "").toLowerCase().endsWith("@asu.edu");
+      if (!isAsuAdmin) return window.location.replace("index.html");
+    }
   };
 
-  // Global logout helper (use in nav: <a onclick="logoutUser()" href="#">Logout</a>)
+  // Global logout helper
   window.logoutUser = function () {
-    try { clearAuth(); } catch (_){}
+    try { clearAuth(); } catch (_) {}
     window.location.href = "login.html";
   };
 })();

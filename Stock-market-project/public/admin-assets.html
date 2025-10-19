@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>MCM Stocks · Admin · Asset Management</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="main.css" />
+
+  <!-- Admin Access Guard -->
+  <script src="main.js"></script>
+  <script>
+    AuthAPI.requireAdmin(); // restrict to ASU admins only
+  </script>
+
+  <style>
+    /* Page-specific helpers */
+    .filters { display:flex; gap:12px; align-items:center; }
+    .input { padding:10px; border:1px solid var(--gray); border-radius:6px; background:var(--white); }
+    .btn-ghost { background:#fff; border:1px solid var(--gray); border-radius:6px; padding:9px 12px; cursor:pointer; }
+    .btn-icon { width:36px; height:36px; display:inline-grid; place-items:center; border:1px solid var(--gray); background:#fff; border-radius:6px; }
+    .pill { display:inline-block; padding:3px 8px; border-radius:999px; border:1px solid var(--gray); font-weight:600; }
+    .pill.eq { color:#1b7f32; background:rgba(27,127,50,.08); border-color:rgba(27,127,50,.25); }
+    .pill.etf { color:#0b6b8c; background:rgba(11,107,140,.08); border-color:rgba(11,107,140,.25); }
+    .tbl td:last-child, .tbl th:last-child { text-align:right; }
+  </style>
+</head>
+
+<body class="admin">
+
+  <!-- Admin Header Tabs -->
+  <header class="admin-header">
+    <div class="admin-logo">MCM Stocks Admin</div>
+    <nav class="admin-nav">
+      <ul>
+        <li><a href="overview.html">Overview</a></li>
+        <li><a href="dashboard.html">Dashboard</a></li>
+        <li><a href="analytics.html">Analytics</a></li>
+        <li><a href="admin-hub.html">Admin Hub</a></li>
+        <li><a href="admin-users.html">User Management</a></li>
+        <li><a href="admin-assets.html" class="active">Asset Management</a></li>
+        <li><a href="admin-market.html">Market Info</a></li>
+        <li><a href="admin-reports.html">Reports</a></li>
+        <li><a href="#" onclick="logoutUser()">Logout</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <!-- Admin Dashboard Layout -->
+  <main class="dashboard">
+    <!-- Sidebar -->
+    <aside class="sidebar card" style="padding-top:12px;">
+      <div class="group">
+        <div class="group-title">Overview</div>
+        <ul>
+          <li><a href="admin-hub.html">Admin Hub</a></li>
+        </ul>
+      </div>
+      <div class="group">
+        <div class="group-title">Management</div>
+        <ul>
+          <li><a href="admin-users.html">User Management</a></li>
+          <li><a class="active" href="admin-assets.html">Asset Management</a></li>
+          <li><a href="admin-market.html">Market Info</a></li>
+          <li><a href="admin-controls.html">Trading Controls</a></li>
+          <li><a href="admin-notifications.html">Notifications</a></li>
+        </ul>
+      </div>
+      <div class="group">
+        <div class="group-title">Reports</div>
+        <ul>
+          <li><a href="admin-reports.html">Trading Reports</a></li>
+          <li><a href="admin-audit.html">Audit Logs</a></li>
+        </ul>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <section class="content">
+      <!-- Page Header -->
+      <div class="card" style="display:flex;align-items:center;justify-content:space-between;">
+        <div>
+          <h2 style="margin:0 0 6px 0;">Asset Management</h2>
+          <div class="muted">Create and manage listed symbols</div>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button class="button positive">+ Add Asset</button>
+        </div>
+      </div>
+
+      <!-- Filters -->
+      <div class="card" style="margin-top:12px;">
+        <div class="filters" style="margin-bottom:12px;">
+          <input class="input" style="flex:1;min-width:260px;" placeholder="Search symbols…" />
+          <select class="input">
+            <option value="">Exchange</option>
+            <option>NASDAQ</option>
+            <option>NYSE</option>
+            <option>AMEX</option>
+          </select>
+          <select class="input">
+            <option value="">Sector</option>
+            <option>Technology</option>
+            <option>Financials</option>
+            <option>Healthcare</option>
+            <option>Energy</option>
+          </select>
+          <select class="input">
+            <option value="">Type</option>
+            <option>Equity</option>
+            <option>ETF</option>
+          </select>
+        </div>
+
+        <!-- Assets Table -->
+        <table class="tbl" id="assetsTable" style="margin:0;">
+          <thead>
+            <tr>
+              <th>Ticker</th>
+              <th>Name</th>
+              <th>Exchange</th>
+              <th>Sector</th>
+              <th>Currency</th>
+              <th>Total Shares</th>
+              <th>Price</th>
+              <th style="text-align:right;">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>AAPL</td>
+              <td>Apple Inc.</td>
+              <td>NASDAQ</td>
+              <td>Technology</td>
+              <td>USD</td>
+              <td>15,700,000,000</td>
+              <td>$192.14 <span class="pill eq">Equity</span></td>
+              <td><button class="btn-icon" aria-label="Actions">⋯</button></td>
+            </tr>
+            <tr>
+              <td>MSFT</td>
+              <td>Microsoft Corp.</td>
+              <td>NASDAQ</td>
+              <td>Technology</td>
+              <td>USD</td>
+              <td>7,450,000,000</td>
+              <td>$420.33 <span class="pill eq">Equity</span></td>
+              <td><button class="btn-icon" aria-label="Actions">⋯</button></td>
+            </tr>
+            <tr>
+              <td>SPY</td>
+              <td>SPDR S&P 500 ETF</td>
+              <td>NYSE</td>
+              <td>Multi-Sector</td>
+              <td>USD</td>
+              <td>1,200,000,000</td>
+              <td>$512.08 <span class="pill etf">ETF</span></td>
+              <td><button class="btn-icon" aria-label="Actions">⋯</button></td>
+            </tr>
+            <tr>
+              <td>XOM</td>
+              <td>Exxon Mobil</td>
+              <td>NYSE</td>
+              <td>Energy</td>
+              <td>USD</td>
+              <td>4,000,000,000</td>
+              <td>$106.71 <span class="pill eq">Equity</span></td>
+              <td><button class="btn-icon" aria-label="Actions">⋯</button></td>
+            </tr>
+            <tr>
+              <td>JPM</td>
+              <td>JPMorgan Chase</td>
+              <td>NYSE</td>
+              <td>Financials</td>
+              <td>USD</td>
+              <td>2,900,000,000</td>
+              <td>$199.54 <span class="pill eq">Equity</span></td>
+              <td><button class="btn-icon" aria-label="Actions">⋯</button></td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="muted" style="padding:10px;">Showing 5 of 5 assets</div>
+      </div>
+
+      <!-- Recent Changes -->
+      <div class="card" style="margin-top:12px;">
+        <h3 style="margin-top:0;">Recent Changes</h3>
+        <table class="tbl" style="margin:0;">
+          <thead>
+            <tr><th>Time</th><th>Action</th><th>Asset</th><th>User</th><th></th></tr>
+          </thead>
+          <tbody>
+            <tr><td>14:10</td><td>Updated price</td><td>AAPL</td><td>admin@…</td><td style="text-align:right;"><a href="admin-audit.html" class="btn-ghost">Details</a></td></tr>
+            <tr><td>13:40</td><td>Added symbol</td><td>SPY</td><td>admin@…</td><td style="text-align:right;"><a href="admin-audit.html" class="btn-ghost">Details</a></td></tr>
+            <tr><td>12:55</td><td>Edited shares</td><td>XOM</td><td>ops@…</td><td style="text-align:right;"><a href="admin-audit.html" class="btn-ghost">Details</a></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <footer>© MCM Stocks</footer>
+</body>
+</html>

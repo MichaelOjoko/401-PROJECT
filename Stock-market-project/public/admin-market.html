@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>MCM Stocks · Admin · Market Info</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="main.css" />
+
+  <!-- Require Admin Access -->
+  <script src="main.js"></script>
+  <script>
+    AuthAPI.requireAdmin(); // Allow only @asu.edu admin users
+  </script>
+
+  <style>
+    .input { padding:10px; border:1px solid var(--gray); border-radius:6px; background:var(--white); }
+    .btn-ghost { background:#fff; border:1px solid var(--gray); border-radius:6px; padding:9px 12px; cursor:pointer; }
+    .row { display:flex; gap:12px; align-items:center; }
+    .col { display:flex; flex-direction:column; gap:8px; }
+    .kpi { display:flex; align-items:center; justify-content:space-between; }
+    .pill { display:inline-block; padding:4px 10px; border-radius:999px; border:1px solid var(--gray); font-weight:700; }
+    .pill.ok { color:#1b7f32; background:rgba(27,127,50,.08); border-color:rgba(27,127,50,.25); }
+    .pill.closed { color:#b91c1c; background:rgba(185,28,28,.08); border-color:rgba(185,28,28,.25); }
+    .tbl td:last-child, .tbl th:last-child { text-align:right; }
+
+    .switch { position:relative; width:54px; height:30px; border-radius:999px; background:#e5e5e5; border:1px solid var(--gray); }
+    .switch::after { content:""; position:absolute; top:3px; left:3px; width:24px; height:24px; border-radius:50%; background:#fff; border:1px solid var(--gray); transition:left .15s; }
+    .switch.on { background:#1b7f32; border-color:#1b7f32; }
+    .switch.on::after { left:27px; }
+  </style>
+</head>
+
+<body class="admin">
+
+  <!-- Unified Admin Header -->
+  <header class="admin-header">
+    <div class="admin-logo">MCM Stocks Admin</div>
+    <nav class="admin-nav">
+      <ul>
+        <li><a href="overview.html">Overview</a></li>
+        <li><a href="dashboard.html">Dashboard</a></li>
+        <li><a href="analytics.html">Analytics</a></li>
+        <li><a href="admin-hub.html">Admin Hub</a></li>
+        <li><a href="admin-users.html">User Management</a></li>
+        <li><a href="admin-assets.html">Asset Management</a></li>
+        <li><a href="admin-market.html" class="active">Market Info</a></li>
+        <li><a href="admin-reports.html">Reports</a></li>
+        <li><a href="#" onclick="logoutUser()">Logout</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <!-- Two-column admin layout -->
+  <main class="dashboard">
+    <!-- Sidebar -->
+    <aside class="sidebar card" style="padding-top:12px;">
+      <div class="group">
+        <div class="group-title">Overview</div>
+        <ul>
+          <li><a href="admin-hub.html">Admin Hub</a></li>
+        </ul>
+      </div>
+      <div class="group">
+        <div class="group-title">Management</div>
+        <ul>
+          <li><a href="admin-users.html">User Management</a></li>
+          <li><a href="admin-assets.html">Asset Management</a></li>
+          <li><a class="active" href="admin-market.html">Market Info</a></li>
+          <li><a href="admin-notifications.html">Notifications</a></li>
+        </ul>
+      </div>
+      <div class="group">
+        <div class="group-title">Reports</div>
+        <ul>
+          <li><a href="admin-reports.html">Trading Reports</a></li>
+          <li><a href="admin-audit.html">Audit Logs</a></li>
+        </ul>
+      </div>
+    </aside>
+
+    <!-- Main content -->
+    <section class="content">
+
+      <!-- Header / actions -->
+      <div class="card kpi">
+        <div>
+          <h2 style="margin:0 0 6px 0;">Market Information</h2>
+          <div class="muted">Status, trading hours, and holiday schedule</div>
+        </div>
+        <div class="row">
+          <button class="btn-ghost">Export</button>
+          <button class="button positive">Save Changes</button>
+        </div>
+      </div>
+
+      <!-- Row: status + next session -->
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-top:12px;">
+        <div class="card">
+          <div class="kpi">
+            <div style="display:flex; gap:10px; align-items:center;">
+              <div class="switch on" title="Market toggle (visual only)"></div>
+              <div>
+                <div style="font-weight:800; font-size:20px;">Market Status</div>
+                <div class="muted">Manual & schedule-based controls</div>
+              </div>
+            </div>
+            <span class="pill ok">OPEN</span>
+          </div>
+          <div class="row" style="margin-top:12px;">
+            <button class="btn-ghost">Pause Trading</button>
+            <button class="btn-ghost">Resume</button>
+            <button class="btn-ghost">Emergency Halt</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <div>
+              <div style="font-weight:800; font-size:20px;">Next Session</div>
+              <div class="muted">Opens Tue, 09:30 (US/Eastern)</div>
+            </div>
+            <span class="pill">Regular Hours</span>
+          </div>
+          <div class="row" style="margin-top:12px;">
+            <div class="col" style="flex:1;">
+              <label class="muted">Today</label>
+              <div>09:30 → 16:00</div>
+            </div>
+            <div class="col" style="flex:1;">
+              <label class="muted">Pre-Market</label>
+              <div>04:00 → 09:30</div>
+            </div>
+            <div class="col" style="flex:1;">
+              <label class="muted">After-Hours</label>
+              <div>16:00 → 20:00</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Trading hours configuration -->
+      <div class="card" style="margin-top:12px;">
+        <h3 style="margin:0 0 8px 0;">Trading Hours (Weekly Schedule)</h3>
+        <div class="muted" style="margin-bottom:10px;">Times in US/Eastern</div>
+        <table class="tbl">
+          <thead>
+            <tr>
+              <th>Day</th>
+              <th>Regular</th>
+              <th>Pre-Market</th>
+              <th>After-Hours</th>
+              <th>Notes</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>Monday</td><td>09:30–16:00</td><td>04:00–09:30</td><td>16:00–20:00</td><td></td></tr>
+            <tr><td>Tuesday</td><td>09:30–16:00</td><td>04:00–09:30</td><td>16:00–20:00</td><td></td></tr>
+            <tr><td>Wednesday</td><td>09:30–16:00</td><td>04:00–09:30</td><td>16:00–20:00</td><td></td></tr>
+            <tr><td>Thursday</td><td>09:30–16:00</td><td>04:00–09:30</td><td>16:00–20:00</td><td></td></tr>
+            <tr><td>Friday</td><td>09:30–16:00</td><td>04:00–09:30</td><td>16:00–20:00</td><td>Early close on select holidays</td></tr>
+            <tr><td>Saturday</td><td>—</td><td>—</td><td>—</td><td>Closed</td></tr>
+            <tr><td>Sunday</td><td>—</td><td>—</td><td>—</td><td>Closed</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Holiday schedule -->
+      <div class="card" style="margin-top:12px;">
+        <div style="display:flex; align-items:center; justify-content:space-between;">
+          <div>
+            <h3 style="margin:0 0 8px 0;">Market Holidays</h3>
+            <div class="muted">Full-day & early-close sessions</div>
+          </div>
+          <div class="row">
+            <input class="input" placeholder="Holiday name…" />
+            <input class="input" type="date" />
+            <select class="input">
+              <option>Closed</option>
+              <option>Early Close (13:00)</option>
+            </select>
+            <button class="button positive">+ Add</button>
+          </div>
+        </div>
+
+        <table class="tbl" style="margin-top:12px;">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Holiday</th>
+              <th>Session</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>2025-01-01</td>
+              <td>New Year’s Day</td>
+              <td><span class="pill closed">Closed</span></td>
+              <td><a href="#" class="btn-ghost">Remove</a></td>
+            </tr>
+            <tr>
+              <td>2025-07-03</td>
+              <td>Independence Day (Obs.)</td>
+              <td><span class="pill">Early Close 13:00</span></td>
+              <td><a href="#" class="btn-ghost">Remove</a></td>
+            </tr>
+            <tr>
+              <td>2025-12-25</td>
+              <td>Christmas Day</td>
+              <td><span class="pill closed">Closed</span></td>
+              <td><a href="#" class="btn-ghost">Remove</a></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Notices / broadcast -->
+      <div class="card" style="margin-top:12px;">
+        <h3 style="margin:0 0 8px 0;">Admin Notices</h3>
+        <div class="row" style="align-items:flex-start;">
+          <input class="input" style="flex:1;" placeholder="Message to all users (e.g., Early close on Friday at 13:00)" />
+          <button class="button positive">Broadcast</button>
+        </div>
+        <div class="muted" style="margin-top:8px;">Recent: “System maintenance tonight 22:00–23:00 ET.”</div>
+      </div>
+
+    </section>
+  </main>
+
+  <footer>© MCM Stocks</footer>
+</body>
+</html>

@@ -138,7 +138,6 @@ footer {
    DASHBOARD + SIDEBAR LAYOUT
    ============================ */
 
-/* Two-column layout: sidebar + main content */
 main.dashboard {
   display: flex;
   align-items: flex-start;
@@ -146,11 +145,11 @@ main.dashboard {
   padding: 16px 0;
 }
 
-/* Sidebar look & behavior */
+/* Sidebar */
 .sidebar {
   width: 260px;
-  position: sticky;       /* stays in view while scrolling */
-  top: 64px;              /* adjust if header height changes */
+  position: sticky;
+  top: 64px;
   padding: 8px 8px 0;
 }
 
@@ -165,11 +164,9 @@ main.dashboard {
   margin: 6px 8px;
 }
 
-/* Remove bullets & tighten spacing */
 .sidebar ul { list-style: none; margin: 0; padding: 0; }
 .sidebar li { margin: 4px 0; }
 
-/* Sidebar links */
 .sidebar a {
   display: block;
   padding: 8px 10px;
@@ -180,27 +177,24 @@ main.dashboard {
   transition: background .15s ease, color .15s ease, transform .05s ease;
 }
 
-.sidebar a:hover { background: rgba(20, 33, 61, .06); } /* navy tint */
+.sidebar a:hover { background: rgba(20, 33, 61, .06); }
 
 .sidebar a.active {
   background: rgba(20, 33, 61, .12);
   border-left: 3px solid var(--gold);
-  padding-left: 7px; /* compensate for border */
+  padding-left: 7px;
   font-weight: 700;
 }
 
-/* Let the main content fill the remaining width */
 main.dashboard .content {
   flex: 1;
-  max-width: none;   /* override .content’s 960px cap when inside dashboard */
+  max-width: none;
   width: 100%;
   margin: 0;
 }
 
-/* Cards inside dashboard get a little extra separation */
 main.dashboard .card { margin-bottom: 12px; }
 
-/* Tables (Portfolio, etc.) */
 .tbl { width: 100%; border-collapse: collapse; }
 .tbl th, .tbl td {
   padding: 10px;
@@ -209,7 +203,6 @@ main.dashboard .card { margin-bottom: 12px; }
 }
 .tbl th { font-weight: 700; color: rgba(0,0,0,.7); }
 
-/* Chips used for Day% and P/L */
 .pill {
   text-align: center;
   border: 1px solid var(--gray);
@@ -220,6 +213,7 @@ main.dashboard .card { margin-bottom: 12px; }
 }
 .pill.pos { border-color: #1b7f32; color: #1b7f32; background: rgba(27,127,50,.08); }
 .pill.neg { border-color: #b91c1c; color: #b91c1c; background: rgba(185,28,28,.08); }
+
 .sidebar {
   background: #f9fafc;
   border-right: 1px solid #ddd;
@@ -242,3 +236,45 @@ main.dashboard .card { margin-bottom: 12px; }
   background: rgba(252, 163, 17, 0.15);
 }
 
+/* ============================
+   ADMIN HEADER STYLING (Scoped)
+   ============================ */
+
+body.admin .admin-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--navy);
+  border-bottom: 3px solid var(--gold);
+  padding: 14px 24px;
+  color: var(--white);
+}
+
+body.admin .admin-logo {
+  font-weight: 700;
+  font-size: 22px;
+  letter-spacing: 0.5px;
+}
+
+body.admin .admin-nav ul {
+  display: flex;
+  list-style: none;
+  gap: 20px;
+  margin: 0;
+  padding: 0;
+}
+
+body.admin .admin-nav a {
+  color: var(--white);
+  text-decoration: none;
+  font-weight: 600;
+  padding: 6px 10px;
+  border-radius: 6px;
+  transition: background 0.2s ease;
+}
+
+body.admin .admin-nav a:hover,
+body.admin .admin-nav a.active {
+  background: var(--gold);
+  color: var(--black);
+}
