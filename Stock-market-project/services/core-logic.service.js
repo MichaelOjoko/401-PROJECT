@@ -135,31 +135,46 @@ module.exports = {
   methods: {
     // ============ USERS ============
     async createUser({ email, passwordHash, fullName }) {
-      // decide role
+      // Step 1: determine role
       let roleQuery = `SELECT role_id, name FROM role WHERE name = 'customer'`;
       if (email.endsWith("@asu.edu")) {
         roleQuery = `SELECT role_id, name FROM role WHERE name = 'admin'`;
       }
-
       const roleResult = await pool.query(roleQuery);
       const { role_id: roleId, name: roleName } = roleResult.rows[0];
 
-      // create user
+      // Step 2: check if email exists
+      const existing = await pool.query(`SELECT email FROM app_user WHERE email=$1`, [email]);
+      if (existing.rows.length > 0) {
+        throw new Error("Email already registered");
+      }
+
+      // Step 3: create user
       const query = `
         INSERT INTO app_user (email, password_hash, full_name, role_id)
         VALUES ($1, $2, $3, $4)
         RETURNING user_id, email, full_name
       `;
-
       const values = [email, passwordHash, fullName, roleId];
       const result = await pool.query(query, values);
 
-      // attach role name for return
       const user = result.rows[0];
       user.role = roleName;
 
-      return user;
+      // Step 4: create default account (cash)
+      const accountQuery = `
+        INSERT INTO account (user_id, account_type, currency, cash_balance)
+        VALUES ($1, 'cash', 'USD', 0)
+        RETURNING account_id, cash_balance, status
+      `;
+      const accountResult = await pool.query(accountQuery, [user.user_id]);
+      const account = accountResult.rows[0];
+
+      // Step 5: return both
+      return { user, account };
     },
+
+
 
 
 
