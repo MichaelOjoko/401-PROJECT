@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Admin · Analytics</title>
+  <style>
+    :root { --fg:#111; --muted:#666; --bg:#fafafa; --card:#fff; --border:#e5e7eb; }
+    html, body { margin:0; padding:0; background:var(--bg); color:var(--fg); font:14px/1.4 system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, 'Helvetica Neue', Arial; }
+    .wrap { max-width:1120px; margin:0 auto; padding:24px; }
+    h1 { font-size:22px; margin:0 0 4px; }
+    .sub { color:var(--muted); margin-bottom:16px; }
+    .row { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; margin-bottom:16px; }
+    .kpi { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:16px; }
+    .kpi .label { color:var(--muted); font-size:12px; }
+    .kpi .val { font-size:28px; font-weight:700; margin-top:6px; }
+    .card { background:var(--card); border:1px solid var(--border); border-radius:12px; overflow:hidden; }
+    .card .head { padding:12px 16px; border-bottom:1px solid var(--border); background:#f7f7f7; font-weight:600; display:flex; justify-content:space-between; align-items:center; }
+    .card .body { padding:16px; }
+    .toolbar { display:flex; gap:8px; align-items:center; margin:8px 0 16px; }
+    .btn { border:1px solid var(--border); background:var(--card); border-radius:8px; padding:8px 10px; cursor:pointer; }
+    .muted { color:var(--muted); }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace; }
+    .error { background:#fef2f2; color:#7f1d1d; border:1px solid #fecaca; padding:10px 12px; border-radius:10px; margin:8px 0 16px; }
+    canvas { width:100%; height:280px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Analytics</h1>
+    <div class="sub">Admin &gt; Analytics</div>
+
+    <div id="error" class="error" style="display:none;"></div>
+
+    <div class="toolbar">
+      <button class="btn" id="reload">Reload</button>
+      <span class="muted">API Base:</span>
+      <span id="apiBase" class="mono muted"></span>
+    </div>
+
+    <div class="row">
+      <div class="kpi">
+        <div class="label">Users</div>
+        <div id="kpiUsers" class="val">-</div>
+      </div>
+      <div class="kpi">
+        <div class="label">Trades</div>
+        <div id="kpiTrades" class="val">-</div>
+      </div>
+      <div class="kpi">
+        <div class="label">Win Rate</div>
+        <div id="kpiWin" class="val">-</div>
+      </div>
+      <div class="kpi">
+        <div class="label">Avg. P&amp;L</div>
+        <div id="kpiAvg" class="val">-</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="head">
+        <div>P&amp;L (Last 30 days)</div>
+        <div class="muted">(Add Chart.js for a line chart)</div>
+      </div>
+      <div class="body">
+        <canvas id="tsChart"></canvas>
+        <div id="chartHint" class="muted" style="margin-top:8px;">
+          Include: <span class="mono">&lt;script src="https://cdn.jsdelivr.net/npm/chart.js"&gt;&lt;/script&gt;</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+  // ---- Config (overridable) -------------------------------------------------
+  window.APP_CONFIG = window.APP_CONFIG || {};
+  window.APP_CONFIG.API_BASE = window.APP_CONFIG.API_BASE || "";
+  window.APP_CONFIG.ANALYTICS = Object.assign({
+    overview: "/api/analytics/overview",
+    timeseries: "/api/analytics/timeseries"
+  }, window.APP_CONFIG.ANALYTICS || {});
+
+  // Query param overrides: ?apiBase=...&overview=...&timeseries=...&range=30d
+  (function applyQueryOverrides(){
+    const q = new URLSearchParams(location.search);
+    if (q.has("apiBase")) window.APP_CONFIG.API_BASE = q.get("apiBase");
+    const A = window.APP_CONFIG.ANALYTICS;
+    if (q.has("overview")) A.overview = q.get("overview");
+    if (q.has("timeseries")) A.timeseries = q.get("timeseries");
+    if (q.has("range")) window._range = q.get("range");
+  })();
+
+  const el = (id) => document.getElementById(id);
+  el("apiBase").textContent = window.APP_CONFIG.API_BASE || "(same-origin)";
+
+  function authHeader(){
+    try{
+      const t = localStorage.getItem("auth.token");
+      return t ? { Authorization: "Bearer " + t } : {};
+    }catch{return {}}
+  }
+  async function httpGet(path, params){
+    const base = window.APP_CONFIG.API_BASE || "";
+    const url = new URL((base || "") + path, location.origin);
+    if (params) Object.entries(params).forEach(([k,v]) => v!=null && url.searchParams.set(k, v));
+    const res = await fetch(url, { headers: { "Content-Type":"application/json", ...authHeader() } });
+    if (!res.ok){
+      const txt = await res.text().catch(()=> "");
+      throw new Error(txt || ("HTTP " + res.status));
+    }
+    const json = await res.json().catch(()=> ({}));
+    return json && (json.data ?? json);
+  }
+
+  let chart;
+  async function load(){
+    hideError();
+    try{
+      const [ov, ts] = await Promise.all([
+        httpGet(window.APP_CONFIG.ANALYTICS.overview),
+        httpGet(window.APP_CONFIG.ANALYTICS.timeseries, { range: window._range || "30d" })
+      ]);
+      const overview = ov || {};
+      el("kpiUsers").textContent  = overview.users ?? "-";
+      el("kpiTrades").textContent = overview.trades ?? "-";
+      el("kpiWin").textContent    = overview.winRate ?? "-";
+      el("kpiAvg").textContent    = overview.avgPnL ?? "-";
+
+      const series = Array.isArray(ts) ? ts : (ts && ts.series) || [];
+      if (window.Chart && el("tsChart")){
+        const ctx = el("tsChart").getContext("2d");
+        const labels = series.map(p => p.t || p.time || "");
+        const data = series.map(p => Number(p.v || p.value || 0));
+        if (chart) { chart.destroy(); }
+        chart = new window.Chart(ctx, {
+          type: "line",
+          data: { labels, datasets: [{ label: "P&L", data }] },
+          options: { responsive:true, maintainAspectRatio:false }
+        });
+        el("chartHint").style.display = "none";
+      } else {
+        el("chartHint").style.display = "";
+      }
+    }catch(e){
+      showError(e && e.message || "Failed to load");
+      console.error(e);
+    }
+  }
+
+  function showError(msg){
+    const box = el("error");
+    box.textContent = msg;
+    box.style.display = "";
+  }
+  function hideError(){
+    el("error").style.display = "none";
+  }
+
+  el("reload").addEventListener("click", load);
+  load();
+  </script>
+</body>
+</html>

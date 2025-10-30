@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Admin · Reports</title>
+  <style>
+    :root { --fg:#111; --muted:#666; --bg:#fafafa; --card:#fff; --border:#e5e7eb; --red:#b91c1c; }
+    html, body { margin:0; padding:0; background:var(--bg); color:var(--fg); font:14px/1.4 system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, 'Helvetica Neue', Arial, 'Apple Color Emoji', 'Segoe UI Emoji'; }
+    .wrap { max-width:1120px; margin:0 auto; padding:24px; }
+    h1 { font-size:22px; margin:0 0 4px; }
+    .sub { color:var(--muted); margin-bottom:16px; }
+    .row { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; margin-bottom:16px; }
+    .kpi { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:16px; }
+    .kpi .label { color:var(--muted); font-size:12px; }
+    .kpi .val { font-size:28px; font-weight:700; margin-top:6px; }
+    .card { background:var(--card); border:1px solid var(--border); border-radius:12px; overflow:hidden; }
+    .card .head { padding:12px 16px; border-bottom:1px solid var(--border); background:#f7f7f7; font-weight:600; }
+    .card .body { padding:0; }
+    table { border-collapse:collapse; width:100%; font-size:13px; }
+    th, td { text-align:left; padding:10px 12px; border-top:1px solid var(--border); }
+    th { color:var(--muted); font-weight:600; background:#fcfcfc; }
+    tr:hover td { background:#fcfcff; }
+    .toolbar { display:flex; gap:8px; align-items:center; margin:8px 0 16px; }
+    .btn { border:1px solid var(--border); background:var(--card); border-radius:8px; padding:8px 10px; cursor:pointer; }
+    .btn:active { transform:translateY(1px); }
+    .error { background:#fef2f2; color:#7f1d1d; border:1px solid #fecaca; padding:10px 12px; border-radius:10px; margin:8px 0 16px; }
+    .muted { color:var(--muted); }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Reports</h1>
+    <div class="sub">Admin &gt; Reports</div>
+
+    <div id="error" class="error" style="display:none;"></div>
+
+    <div class="toolbar">
+      <button class="btn" id="reload">Reload</button>
+      <span class="muted">API Base:</span>
+      <span id="apiBase" class="mono muted"></span>
+    </div>
+
+    <div class="row">
+      <div class="kpi">
+        <div class="label">Total Trades</div>
+        <div id="kpiTrades" class="val">-</div>
+      </div>
+      <div class="kpi">
+        <div class="label">Active Users</div>
+        <div id="kpiUsers" class="val">-</div>
+      </div>
+      <div class="kpi">
+        <div class="label">P&amp;L (30d)</div>
+        <div id="kpiPnl" class="val">-</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="head">Recent Reports</div>
+      <div class="body">
+        <table>
+          <thead>
+            <tr>
+              <th style="width:56px;">#</th>
+              <th>Title</th>
+              <th>Type</th>
+              <th>Created</th>
+            </tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <p class="muted" style="margin-top:12px;">
+      Tip: configure endpoints via <span class="mono">window.APP_CONFIG.REPORTS</span> or query params.
+    </p>
+  </div>
+
+  <script>
+  // ---- Config (overridable) -------------------------------------------------
+  window.APP_CONFIG = window.APP_CONFIG || {};
+  window.APP_CONFIG.API_BASE = window.APP_CONFIG.API_BASE || "";
+  window.APP_CONFIG.REPORTS = Object.assign({
+    summary: "/api/reports/summary",
+    list: "/api/reports"
+  }, window.APP_CONFIG.REPORTS || {});
+
+  // Allow overrides via query string: ?apiBase=...&summary=...&list=...
+  (function applyQueryOverrides(){
+    const q = new URLSearchParams(location.search);
+    if (q.has("apiBase")) window.APP_CONFIG.API_BASE = q.get("apiBase");
+    const R = window.APP_CONFIG.REPORTS;
+    if (q.has("summary")) R.summary = q.get("summary");
+    if (q.has("list")) R.list = q.get("list");
+  })();
+
+  const el = (id) => document.getElementById(id);
+  el("apiBase").textContent = window.APP_CONFIG.API_BASE || "(same-origin)";
+
+  function authHeader(){
+    try{
+      const t = localStorage.getItem("auth.token");
+      return t ? { Authorization: "Bearer " + t } : {};
+    }catch{return {}}
+  }
+  async function httpGet(path, params){
+    const base = window.APP_CONFIG.API_BASE || "";
+    const url = new URL((base || "") + path, location.origin);
+    if (params) Object.entries(params).forEach(([k,v]) => v!=null && url.searchParams.set(k, v));
+    const res = await fetch(url, { headers: { "Content-Type":"application/json", ...authHeader() } });
+    if (!res.ok){
+      const txt = await res.text().catch(()=> "");
+      throw new Error(txt || ("HTTP " + res.status));
+    }
+    const json = await res.json().catch(()=> ({}));
+    return json && (json.data ?? json);
+  }
+
+  async function load(){
+    hideError();
+    try{
+      const [sum, list] = await Promise.all([
+        httpGet(window.APP_CONFIG.REPORTS.summary),
+        httpGet(window.APP_CONFIG.REPORTS.list, { limit: 25 })
+      ]);
+      const summary = sum || {};
+      el("kpiTrades").textContent = summary.totalTrades ?? "-";
+      el("kpiUsers").textContent  = summary.activeUsers ?? "-";
+      el("kpiPnl").textContent    = summary.pnl30d ?? "-";
+
+      const items = Array.isArray(list) ? list : (list && (list.items || [])) || [];
+      const tbody = el("tbody");
+      tbody.innerHTML = "";
+      if (!items.length){
+        const tr = document.createElement("tr");
+        const td = document.createElement("td");
+        td.colSpan = 4;
+        td.className = "muted";
+        td.textContent = "No reports found.";
+        tr.appendChild(td);
+        tbody.appendChild(tr);
+      } else {
+        items.forEach((r, i) => {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td>${i+1}</td>
+            <td>${(r.title || r.name || ("Report " + (r.id??"")))}</td>
+            <td>${r.type || "-"}</td>
+            <td>${r.createdAt || r.created_at || "-"}</td>
+          `;
+          tbody.appendChild(tr);
+        });
+      }
+    }catch(e){
+      showError(e && e.message || "Failed to load");
+      console.error(e);
+    }
+  }
+
+  function showError(msg){
+    const box = el("error");
+    box.textContent = msg;
+    box.style.display = "";
+  }
+  function hideError(){
+    el("error").style.display = "none";
+  }
+
+  el("reload").addEventListener("click", load);
+  load();
+  </script>
+</body>
+</html>
