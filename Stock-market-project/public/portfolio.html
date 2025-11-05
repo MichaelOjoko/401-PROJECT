@@ -7,11 +7,46 @@
   <link href="https://fonts.googleapis.com/css?family=Source+Sans+Pro:300,400,600,700" rel="stylesheet" />
   <link rel="stylesheet" href="./main.css" />
   <script src="./main.js"></script>
-  <!-- (Optional) remove this inline style; main.css already has .tbl/.pill/mono -->
   <style>
     .tbl { width:100%; border-collapse: collapse; }
     .tbl th, .tbl td { padding:10px; border-bottom:1px solid var(--gray); text-align:left; }
     .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
+    .pill { display:inline-block; padding:2px 8px; border-radius:999px; border:1px solid #ddd; font-weight:600; font-size:12px; }
+    .pos { color:#0a7f49; background:rgba(10,127,73,.08); border-color:rgba(10,127,73,.25); }
+    .neg { color:#b21b1b; background:rgba(178,27,27,.08); border-color:rgba(178,27,27,.25); }
+    .balance {
+      display:flex; align-items:center; justify-content:space-between;
+      background:#fff; border:1px solid var(--gray); border-radius:12px;
+      padding:14px 16px; margin: 10px 0 6px;
+    }
+    .balance .amt { font-size:22px; font-weight:700; }
+    .totals { display:flex; gap:16px; flex-wrap:wrap; margin-top:6px; }
+    .totals .cardlet { border:1px solid var(--gray); border-radius:10px; padding:10px 12px; background:#fff; }
+
+    /* NEW: Owned stocks cards */
+    .owned {
+      margin-top:16px;
+    }
+    .owned h3 {
+      margin: 10px 0 8px;
+      font-size: 18px;
+    }
+    .owned-grid {
+      display:grid;
+      grid-template-columns: repeat(3, minmax(0,1fr));
+      gap:12px;
+    }
+    @media (max-width: 1100px){ .owned-grid { grid-template-columns: repeat(2, minmax(0,1fr)); } }
+    @media (max-width: 700px){ .owned-grid { grid-template-columns: 1fr; } }
+    .owned-card {
+      background:#fff; border:1px solid var(--gray); border-radius:12px; padding:12px;
+      display:flex; align-items:center; justify-content:space-between;
+    }
+    .owned-left { display:flex; flex-direction:column; gap:2px; }
+    .owned-ticker { font-weight:700; font-size:16px; }
+    .owned-sub { font-size:12px; color: var(--text-muted,#6b7280); }
+    .owned-right { text-align:right; }
+    .owned-val { font-weight:700; }
   </style>
 </head>
 <body>
@@ -20,10 +55,8 @@
     <nav>
       <ul>
         <li><a href="index.html" data-top="index.html">Home</a></li>
-        <li><a href="trade.html" data-top="trade.html">Trade</a></li>
-        <li><a href="cash.html" data-top="cash.html">Cash</a></li>
-
-        <!-- IDs for auth toggle -->
+        <li><a href="cash.html" data-top="cash.html">Wallet</a></li>
+        <li id="nav-market"><a href="market.html" data-top="market.html">Market</a></li>
         <li id="nav-login"><a href="login.html" data-top="login.html">Login</a></li>
         <li id="nav-register"><a href="register.html" data-top="register.html">Register</a></li>
         <li id="nav-logout" style="display:none;"><a href="#" onclick="logoutUser()">Logout</a></li>
@@ -38,8 +71,8 @@
         <ul>
           <li><a href="dashboard.html" data-route="index.html">Overview</a></li>
           <li><a href="portfolio.html" class="active" data-route="portfolio.html">Portfolio</a></li>
-          <li><a href="trade.html" data-route="trade.html">Trading</a></li>
-          <li><a href="cash.html" data-route="cash.html">Cash</a></li>
+          <li><a href="market.html" data-route="market.html">Trading</a></li>
+          <li><a href="cash.html" data-route="cash.html">Wallet</a></li>
         </ul>
       </div>
       <div class="group">
@@ -50,28 +83,39 @@
           <li><a href="settings.html" data-route="settings.html">Settings</a></li>
         </ul>
       </div>
-      <div class="group">
-        <div class="group-title">Quick</div>
-        <ul>
-          <li><a href="trade.html?sell=1" data-route="trade.html">Sell Stock</a></li>
-          <li><a href="portfolio.html" data-route="portfolio.html">View Portfolio</a></li>
-          <li><a href="research.html" data-route="research.html">Market Research</a></li>
-        </ul>
-      </div>
     </aside>
 
-    <!-- ✅ Add class="content" so dashboard layout applies -->
     <section class="content">
       <div class="card">
         <h1 style="margin-top:0;">Portfolio</h1>
-        <p class="muted">Your holdings, allocations, and P&amp;L.</p>
+        <div class="balance">
+          <div>
+            <div class="muted">Cash Balance</div>
+            <div class="amt" id="balAmt">$—</div>
+          </div>
+          <div class="muted" id="balCcy">USD</div>
+        </div>
+
+        <div class="totals">
+          <div class="cardlet"><div class="muted">Positions Value</div><div id="tVal">$—</div></div>
+          <div class="cardlet"><div class="muted">Total (Cash + Positions)</div><div id="tAll">$—</div></div>
+        </div>
+
+        <!-- NEW: Owned Stocks section -->
+        <div class="owned">
+          <h3>Owned Stocks</h3>
+          <div id="ownedGrid" class="owned-grid">
+            <!-- Cards injected here -->
+          </div>
+        </div>
+
         <table class="tbl" style="margin-top:12px;">
           <thead>
             <tr>
-              <th>Ticker</th><th>Company</th><th>Qty</th><th>Avg Cost</th><th>Last Price</th><th>Day %</th><th>Unrealized P&amp;L</th>
+              <th>Ticker</th><th>Company</th><th>Qty</th><th>Avg Cost</th><th>Last Price</th><th>Unrealized P&amp;L</th>
             </tr>
           </thead>
-          <tbody id="pf-rows"></tbody>
+          <tbody id="pf-rows"><tr><td colspan="6">Loading…</td></tr></tbody>
         </table>
       </div>
     </section>
@@ -80,67 +124,144 @@
   <footer class="content"><p class="muted">© 2025 MCM Stocks</p></footer>
 
   <script>
-    // Require auth
+    // ===== Guard
     (function guard(){
       const { token } = (window.AuthAPI && AuthAPI.loadAuth()) || { token:'' };
       if (!token) location.replace('login.html');
     })();
 
-    // Highlight active links
-    (function highlight(){
-      const p = location.pathname.split('/').pop() || 'portfolio.html';
-      document.querySelectorAll('.sidebar a[data-route]').forEach(a =>
-        a.classList.toggle('active', a.getAttribute('data-route') === p)
-      );
-      document.querySelectorAll('header nav a[data-top]').forEach(a =>
-        a.classList.toggle('active', a.getAttribute('data-top') === p)
-      );
-    })();
-
-    // demo data (replace with API)
-    const data = [
-      { t:'AAPL', n:'Apple Inc.', qty:120, avg:182.50, last:186.20, day:+1.2, pl:+444 },
-      { t:'MSFT', n:'Microsoft',  qty:55,  avg:398.10, last:395.05, day:-0.6, pl:-167 },
-      { t:'TSLA', n:'Tesla',      qty:20,  avg:255.00, last:260.30, day:+2.1, pl:+106 }
-    ];
-    const tb = document.getElementById('pf-rows');
-    data.forEach(r=>{
-      const tr = document.createElement('tr');
-      const dayClass = r.day >= 0 ? 'pill pos' : 'pill neg';
-      const daySign  = r.day >= 0 ? '+' : '';
-      const plClass  = r.pl  >= 0 ? 'pill pos' : 'pill neg';
-      const plSign   = r.pl  >= 0 ? '' : '-';
-
-      tr.innerHTML =
-        `<td class="mono">${r.t}</td>
-         <td>${r.n}</td>
-         <td>${r.qty}</td>
-         <td>$${r.avg.toFixed(2)}</td>
-         <td>$${r.last.toFixed(2)}</td>
-         <td><span class="${dayClass}">${daySign}${r.day}%</span></td>
-         <td><span class="${plClass}">${plSign}$${Math.abs(r.pl)}</span></td>`;
-      tb.appendChild(tr);
-    });
-  </script>
-
-  <!-- Show Login/Register vs Logout -->
-  <script>
+    // ===== Header auth toggle
     document.addEventListener("DOMContentLoaded", () => {
       const loggedIn = !!(window.AuthAPI && AuthAPI.isAuthenticated && AuthAPI.isAuthenticated());
       const logoutItem = document.getElementById("nav-logout");
       const loginItem  = document.getElementById("nav-login");
       const regItem    = document.getElementById("nav-register");
-
-      if (loggedIn) {
-        if (logoutItem) logoutItem.style.display = "inline-block";
-        if (loginItem)  loginItem.style.display  = "none";
-        if (regItem)    regItem.style.display    = "none";
-      } else {
-        if (logoutItem) logoutItem.style.display = "none";
-        if (loginItem)  loginItem.style.display  = "inline-block";
-        if (regItem)    regItem.style.display    = "inline-block";
-      }
+      if (loggedIn) { if (logoutItem) logoutItem.style.display='inline-block'; if (loginItem) loginItem.style.display='none'; if (regItem) regItem.style.display='none';
+      } else { if (logoutItem) logoutItem.style.display='none'; if (loginItem) loginItem.style.display='inline-block'; if (regItem) regItem.style.display='inline-block'; }
     });
+
+    // ===== Utilities
+    const $ = (s, el=document)=>el.querySelector(s);
+    const fmt2 = (n)=>'$' + Number(n||0).toFixed(2);
+
+    function getUserId(){
+      try { const a = (window.AuthAPI && AuthAPI.loadAuth()) || {}; return a.id ? String(a.id) : null; }
+      catch(_) { return null; }
+    }
+
+    async function authGet(url){
+      const res = await AuthAPI.fetch(url, { method:'GET' });
+      if (!res.ok) throw new Error(res?.data?.message || ('GET ' + url + ' failed'));
+      return res.data;
+    }
+
+    async function fetchBalance(){
+      const uid = getUserId();
+      if (!uid) return { balance:null, currency:'USD' };
+
+      const tryGet = async (u) => { try { return await authGet(u); } catch(_){ return null; } };
+
+      let data = await tryGet(`/api/accounts/users/balance?userId=${encodeURIComponent(uid)}`);
+      if (!data) data = await tryGet(`/api/accounts/users/summary?userId=${encodeURIComponent(uid)}`);
+      if (!data) data = await tryGet('/api/users/me');
+
+      if (!data) return { balance:null, currency:'USD' };
+
+      if (typeof data.balance === 'number') return { balance:data.balance, currency: data.currency || 'USD' };
+      if (typeof data.cash_balance === 'number') return { balance:data.cash_balance, currency: data.currency || 'USD' };
+      if (data.account && typeof data.account.cash_balance === 'number') return { balance:data.account.cash_balance, currency: data.account.currency || 'USD' };
+      if (Array.isArray(data.accounts) && data.accounts[0] && typeof data.accounts[0].cash_balance === 'number')
+        return { balance:data.accounts[0].cash_balance, currency: data.accounts[0].currency || 'USD' };
+
+      return { balance:null, currency: data.currency || 'USD' };
+    }
+
+    async function fetchPositions(){
+      const uid = getUserId();
+      const rows = await authGet(`/api/portfolio?userId=${encodeURIComponent(uid || '')}`);
+
+      const assetsRes = await fetch('/api/market/assets?limit=1000');
+      const assetsJson = await assetsRes.json().catch(()=>({}));
+      const assets = assetsJson?.data || [];
+      const price = {};
+      assets.forEach(a => price[a.ticker] = Number(a.initial_price || 0));
+
+      return (rows || []).map(r => {
+        const last = price[r.ticker] ?? 0;
+        const avg  = Number(r.avg_cost || 0);
+        const qty  = Number(r.quantity || 0);
+        const pl   = (last - avg) * qty;
+        return { ...r, last, pl, avg_cost: avg, quantity: qty };
+      });
+    }
+
+    function renderOwned(rows){
+      const wrap = $('#ownedGrid');
+      if (!rows.length){
+        wrap.innerHTML = `<div class="muted" style="grid-column:1/-1;">No holdings yet. Head to <a href="market.html">Market</a> to start investing.</div>`;
+        return;
+      }
+
+      wrap.innerHTML = rows.map(r=>{
+        const mv = r.last * r.quantity;            // market value
+        const plClass = r.pl >= 0 ? 'pill pos' : 'pill neg';
+        const signPl  = r.pl >= 0 ? '' : '-';
+        return `
+          <div class="owned-card">
+            <div class="owned-left">
+              <div class="owned-ticker mono">${r.ticker}</div>
+              <div class="owned-sub">Qty ${r.quantity} • Avg ${fmt2(r.avg_cost)} • Last ${fmt2(r.last)}</div>
+            </div>
+            <div class="owned-right">
+              <div class="owned-val">${fmt2(mv)}</div>
+              <div class="${plClass}" style="margin-top:4px;">${signPl}$${Math.abs(r.pl).toFixed(2)}</div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    async function render(){
+      // balance
+      const { balance, currency } = await fetchBalance();
+      $('#balAmt').textContent = (balance == null) ? '$—' : fmt2(balance);
+      $('#balCcy').textContent = currency || 'USD';
+
+      // positions
+      const rows = await fetchPositions();
+
+      // NEW: render owned cards
+      renderOwned(rows);
+
+      // table
+      const tb = $('#pf-rows');
+      if (!rows.length){
+        tb.innerHTML = `<tr><td colspan="6" class="muted">You have no positions yet. Go to <a href="market.html">Market</a> to buy.</td></tr>`;
+      } else {
+        tb.innerHTML = rows.map(r=>{
+          const plClass = r.pl >= 0 ? 'pill pos' : 'pill neg';
+          const signPl  = r.pl >= 0 ? '' : '-';
+          return `
+            <tr>
+              <td class="mono">${r.ticker}</td>
+              <td>${r.name || '-'}</td>
+              <td>${r.quantity}</td>
+              <td>${fmt2(r.avg_cost)}</td>
+              <td>${fmt2(r.last)}</td>
+              <td><span class="${plClass}">${signPl}$${Math.abs(r.pl).toFixed(2)}</span></td>
+            </tr>
+          `;
+        }).join('');
+      }
+
+      // totals
+      const posVal = rows.reduce((s,r)=> s + (r.last * (r.quantity||0)), 0);
+      $('#tVal').textContent = fmt2(posVal);
+      const cash = Number((balance==null)?0:balance);
+      $('#tAll').textContent = fmt2(posVal + cash);
+    }
+
+    document.addEventListener('DOMContentLoaded', render);
   </script>
 </body>
 </html>

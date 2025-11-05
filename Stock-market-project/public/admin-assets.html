@@ -22,6 +22,29 @@
     .pill.eq { color:#1b7f32; background:rgba(27,127,50,.08); border-color:rgba(27,127,50,.25); }
     .pill.etf { color:#0b6b8c; background:rgba(11,107,140,.08); border-color:rgba(11,107,140,.25); }
     .tbl td:last-child, .tbl th:last-child { text-align:right; }
+
+    /* Modal */
+    .modal-backdrop {
+      position: fixed; inset: 0; background: rgba(0,0,0,.4);
+      display:none; align-items:center; justify-content:center; z-index: 1000;
+    }
+    .modal { background:#fff; color:#111; border-radius:12px; width:min(720px, 92vw); box-shadow: 0 10px 30px rgba(0,0,0,.25); }
+    .modal header, .modal footer { padding:14px 16px; border-bottom:1px solid #eee; }
+    .modal header { display:flex; align-items:center; justify-content:space-between; }
+    .modal .body { padding:16px; }
+    .grid-2 { display:grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap:12px; }
+    .grid-3 { display:grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap:12px; }
+    .field label { display:block; font-weight:600; margin-bottom:6px; }
+    .field input, .field select {
+      width:100%; padding:10px; border:1px solid #ccc; border-radius:6px; background:#fff;
+    }
+    .modal footer { display:flex; justify-content:flex-end; gap:10px; border-top:1px solid #eee; }
+    .badgeline { font-size:12px; color:#666; }
+    .sr { position:absolute; left:-9999px; }
+
+    /* Empty & skeleton */
+    .empty { padding:14px; color:#666; }
+    .skeleton-row td { color:transparent; }
   </style>
 </head>
 
@@ -79,32 +102,29 @@
           <div class="muted">Create and manage listed symbols</div>
         </div>
         <div style="display:flex;gap:8px;">
-          <button class="button positive">+ Add Asset</button>
+          <button id="btnAddAsset" class="button positive">+ Add Asset</button>
         </div>
       </div>
 
       <!-- Filters -->
       <div class="card" style="margin-top:12px;">
         <div class="filters" style="margin-bottom:12px;">
-          <input class="input" style="flex:1;min-width:260px;" placeholder="Search symbols…" />
-          <select class="input">
+          <input id="q" class="input" style="flex:1;min-width:260px;" placeholder="Search symbols…" />
+          <select id="fExchange" class="input">
             <option value="">Exchange</option>
             <option>NASDAQ</option>
             <option>NYSE</option>
             <option>AMEX</option>
           </select>
-          <select class="input">
+          <select id="fSector" class="input">
             <option value="">Sector</option>
             <option>Technology</option>
             <option>Financials</option>
             <option>Healthcare</option>
             <option>Energy</option>
           </select>
-          <select class="input">
-            <option value="">Type</option>
-            <option>Equity</option>
-            <option>ETF</option>
-          </select>
+          <button id="btnApplyFilters" class="btn-ghost">Apply</button>
+          <button id="btnResetFilters" class="btn-ghost">Reset</button>
         </div>
 
         <!-- Assets Table -->
@@ -121,64 +141,15 @@
               <th style="text-align:right;">Actions</th>
             </tr>
           </thead>
-          <tbody>
-            <tr>
-              <td>AAPL</td>
-              <td>Apple Inc.</td>
-              <td>NASDAQ</td>
-              <td>Technology</td>
-              <td>USD</td>
-              <td>15,700,000,000</td>
-              <td>$192.14 <span class="pill eq">Equity</span></td>
-              <td><button class="btn-icon" aria-label="Actions">⋯</button></td>
-            </tr>
-            <tr>
-              <td>MSFT</td>
-              <td>Microsoft Corp.</td>
-              <td>NASDAQ</td>
-              <td>Technology</td>
-              <td>USD</td>
-              <td>7,450,000,000</td>
-              <td>$420.33 <span class="pill eq">Equity</span></td>
-              <td><button class="btn-icon" aria-label="Actions">⋯</button></td>
-            </tr>
-            <tr>
-              <td>SPY</td>
-              <td>SPDR S&P 500 ETF</td>
-              <td>NYSE</td>
-              <td>Multi-Sector</td>
-              <td>USD</td>
-              <td>1,200,000,000</td>
-              <td>$512.08 <span class="pill etf">ETF</span></td>
-              <td><button class="btn-icon" aria-label="Actions">⋯</button></td>
-            </tr>
-            <tr>
-              <td>XOM</td>
-              <td>Exxon Mobil</td>
-              <td>NYSE</td>
-              <td>Energy</td>
-              <td>USD</td>
-              <td>4,000,000,000</td>
-              <td>$106.71 <span class="pill eq">Equity</span></td>
-              <td><button class="btn-icon" aria-label="Actions">⋯</button></td>
-            </tr>
-            <tr>
-              <td>JPM</td>
-              <td>JPMorgan Chase</td>
-              <td>NYSE</td>
-              <td>Financials</td>
-              <td>USD</td>
-              <td>2,900,000,000</td>
-              <td>$199.54 <span class="pill eq">Equity</span></td>
-              <td><button class="btn-icon" aria-label="Actions">⋯</button></td>
-            </tr>
+          <tbody id="assetsTbody">
+            <!-- rows injected by script -->
           </tbody>
         </table>
 
-        <div class="muted" style="padding:10px;">Showing 5 of 5 assets</div>
+        <div class="muted" id="assetsFooter" style="padding:10px;">Loading…</div>
       </div>
 
-      <!-- Recent Changes -->
+      <!-- Recent Changes (static placeholder) -->
       <div class="card" style="margin-top:12px;">
         <h3 style="margin-top:0;">Recent Changes</h3>
         <table class="tbl" style="margin:0;">
@@ -195,6 +166,224 @@
     </section>
   </main>
 
+  <!-- Create Asset Modal -->
+  <div id="modalBackdrop" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="createAssetTitle">
+    <div class="modal">
+      <header>
+        <h3 id="createAssetTitle" style="margin:0;">Create New Asset</h3>
+        <button id="btnCloseModal" class="btn-ghost" aria-label="Close">✕</button>
+      </header>
+      <div class="body">
+        <div class="badgeline">Fields marked <span aria-hidden="true">*</span><span class="sr">required</span> are required.</div>
+        <form id="assetForm">
+          <div class="grid-3" style="margin-top:12px;">
+            <div class="field">
+              <label for="ticker">Ticker *</label>
+              <input id="ticker" name="ticker" maxlength="8" required />
+            </div>
+            <div class="field">
+              <label for="name">Name *</label>
+              <input id="name" name="name" required />
+            </div>
+            <div class="field">
+              <label for="exchange">Exchange *</label>
+              <select id="exchange" name="exchange" required>
+                <option value="">Select…</option>
+                <option>NASDAQ</option>
+                <option>NYSE</option>
+                <option>AMEX</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="grid-3">
+            <div class="field">
+              <label for="sector">Sector *</label>
+              <select id="sector" name="sector" required>
+                <option value="">Select…</option>
+                <option>Technology</option>
+                <option>Financials</option>
+                <option>Healthcare</option>
+                <option>Energy</option>
+                <option>Consumer Discretionary</option>
+                <option>Consumer Staples</option>
+                <option>Industrials</option>
+                <option>Materials</option>
+                <option>Utilities</option>
+                <option>Real Estate</option>
+                <option>Communication Services</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="currency">Currency *</label>
+              <select id="currency" name="currency" required>
+                <option value="">Select…</option>
+                <option>USD</option>
+                <option>EUR</option>
+                <option>GBP</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="initialPrice">Initial Price (USD) *</label>
+              <input id="initialPrice" name="initialPrice" type="number" step="0.01" min="0" required />
+            </div>
+          </div>
+
+          <div class="grid-2">
+            <div class="field">
+              <label for="totalShares">Total Shares *</label>
+              <input id="totalShares" name="totalShares" type="number" step="1" min="0" required />
+            </div>
+            <div></div>
+          </div>
+        </form>
+      </div>
+      <footer>
+        <button id="btnCancel" class="btn-ghost">Cancel</button>
+        <button id="btnCreate" class="button positive">Create Asset</button>
+      </footer>
+    </div>
+  </div>
+
   <footer>© MCM Stocks</footer>
+
+  <script>
+    // ========= Helpers =========
+    const $ = (sel, el=document) => el.querySelector(sel);
+    const $$ = (sel, el=document) => Array.from(el.querySelectorAll(sel));
+    const formatInt = (n) => Number(n ?? 0).toLocaleString();
+    const formatPrice = (n) => '$' + Number(n ?? 0).toFixed(2);
+
+    // prefer authenticated fetch if available
+    async function httpJson(url, opts={}) {
+      if (window.AuthAPI && typeof AuthAPI.fetchAuth === 'function') {
+        const r = await AuthAPI.fetchAuth(url, { headers: { 'Content-Type':'application/json' }, ...opts });
+        return r.json();
+      }
+      const r = await fetch(url, { headers: { 'Content-Type':'application/json' }, ...opts });
+      return r.json();
+    }
+
+    // ========= State =========
+    let allRows = [];   // last loaded rows from API (for client-side filter)
+
+    // ========= Load & Render =========
+    async function loadAssets() {
+      const tbody = $('#assetsTbody');
+      const footer = $('#assetsFooter');
+      // skeleton
+      tbody.innerHTML = `
+        <tr class="skeleton-row"><td colspan="8">Loading…</td></tr>
+        <tr class="skeleton-row"><td colspan="8">Loading…</td></tr>
+        <tr class="skeleton-row"><td colspan="8">Loading…</td></tr>
+      `;
+      footer.textContent = 'Loading…';
+
+      try {
+        const q = $('#q').value.trim();
+        const payload = await httpJson('/api/market/assets?limit=500' + (q ? '&q=' + encodeURIComponent(q) : ''));
+        const rows = payload?.data || [];
+        allRows = rows;
+        renderTable();
+      } catch (e) {
+        tbody.innerHTML = `<tr><td colspan="8" class="empty">Failed to load assets: ${e.message}</td></tr>`;
+        $('#assetsFooter').textContent = '';
+      }
+    }
+
+    function renderTable() {
+      const tbody = $('#assetsTbody');
+      const footer = $('#assetsFooter');
+
+      // simple client filters (exchange/sector)
+      const ex = $('#fExchange').value;
+      const sec = $('#fSector').value;
+
+      const filtered = allRows.filter(r =>
+        (!ex || r.exchange === ex) &&
+        (!sec || r.sector === sec)
+      );
+
+      if (!filtered.length) {
+        tbody.innerHTML = `<tr><td colspan="8" class="empty">No assets match your filters.</td></tr>`;
+        footer.textContent = 'Showing 0 of 0';
+        return;
+      }
+
+      tbody.innerHTML = filtered.map(r => `
+        <tr>
+          <td>${r.ticker}</td>
+          <td>${r.name}</td>
+          <td>${r.exchange || '-'}</td>
+          <td>${r.sector || '-'}</td>
+          <td>${r.currency || '-'}</td>
+          <td>${formatInt(r.total_shares)}</td>
+          <td>${formatPrice(r.initial_price)} <span class="pill eq">Equity</span></td>
+          <td><button class="btn-icon" aria-label="Actions">⋯</button></td>
+        </tr>
+      `).join('');
+
+      footer.textContent = `Showing ${filtered.length} of ${allRows.length} assets`;
+    }
+
+    // ========= Create Asset Modal =========
+    const modal = $('#modalBackdrop');
+    const openModal = () => { modal.style.display = 'flex'; setTimeout(() => $('#ticker').focus(), 0); };
+    const closeModal = () => { modal.style.display = 'none'; $('#assetForm').reset(); };
+
+    $('#btnAddAsset').addEventListener('click', openModal);
+    $('#btnCloseModal').addEventListener('click', closeModal);
+    $('#btnCancel').addEventListener('click', closeModal);
+    modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+
+    // Create call
+    $('#btnCreate').addEventListener('click', async () => {
+      const f = $('#assetForm');
+      if (!f.reportValidity()) return;
+
+      const data = {
+        ticker: $('#ticker').value.trim().toUpperCase(),
+        name: $('#name').value.trim(),
+        exchange: $('#exchange').value,
+        sector: $('#sector').value,
+        currency: $('#currency').value,
+        totalShares: Number($('#totalShares').value),
+        initialPrice: Number($('#initialPrice').value)
+      };
+
+      try {
+        // POST /api/stocks -> core-logic.createStock
+        const res = await httpJson('/api/stocks', {
+          method: 'POST',
+          body: JSON.stringify(data)
+        });
+
+        if (res && res.stock) {
+          // Optimistic prepend OR just reload full list
+          closeModal();
+          await loadAssets();
+        } else if (res && res.message === 'Stock created') {
+          closeModal();
+          await loadAssets();
+        } else {
+          alert('Create failed: ' + (res?.message || JSON.stringify(res)));
+        }
+      } catch (e) {
+        alert('Create failed: ' + e.message);
+      }
+    });
+
+    // ========= Filters =========
+    $('#btnApplyFilters').addEventListener('click', renderTable);
+    $('#btnResetFilters').addEventListener('click', () => {
+      $('#q').value = '';
+      $('#fExchange').value = '';
+      $('#fSector').value = '';
+      renderTable();
+    });
+
+    // ========= Init =========
+    document.addEventListener('DOMContentLoaded', loadAssets);
+  </script>
 </body>
 </html>

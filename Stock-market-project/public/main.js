@@ -27,6 +27,9 @@
     role:  "auth.role"
   };
 
+  // Balance cache (prevents UI from flashing back to "—")
+  const BAL_KEY = "acct.balance";
+
   // (one-time) migrate away from old tenant key if it exists
   try { localStorage.removeItem("auth.tenant"); } catch (_) {}
 
@@ -69,6 +72,7 @@
     Object.values(LS_KEYS).forEach(k => {
       try { localStorage.removeItem(k); } catch (_) {}
     });
+    try { localStorage.removeItem(BAL_KEY); } catch(_){}
     try { window.dispatchEvent(new CustomEvent("auth:changed", { detail: loadAuth() })); } catch (_) {}
   }
 
@@ -155,6 +159,8 @@
         id:    user.id ?? user.userId ?? user._id ?? "",
         role:  user.role ?? user.userRole ?? ""
       });
+      try { localStorage.removeItem(BAL_KEY); } catch(_){}
+      // keep redirect control with caller
     }
     return { ...result, token };
   }
@@ -167,6 +173,58 @@
     const headers = authHeaders(options.headers || {});
     const { res, data } = await coreFetch(path, { ...options, headers });
     return shape(res, data);
+  }
+
+  // =================
+  // REDIRECT HELPERS
+  // =================
+  function getReturnTo(defaultPath = "market.html") {
+    try {
+      const url = new URL(window.location.href);
+      return url.searchParams.get("returnTo") || defaultPath;
+    } catch (_) {
+      return defaultPath;
+    }
+  }
+
+  function redirectAfterLogin(email) {
+    const isAdmin = (email || "").toLowerCase().endsWith("@asu.edu");
+    const fallback = isAdmin ? "admin-hub.html" : "market.html";
+    const to = getReturnTo(fallback);
+    window.location.href = to;
+  }
+
+  // =================
+  // ACCOUNT HELPERS (BALANCE)
+  // =================
+  function getCachedBalance() {
+    const v = localStorage.getItem(BAL_KEY);
+    return v == null ? null : Number(v);
+  }
+  function setCachedBalance(v) {
+    try { localStorage.setItem(BAL_KEY, String(v)); } catch(_){}
+    try { window.dispatchEvent(new CustomEvent("account:balance-changed", { detail: { balance: Number(v) } })); } catch(_){}
+  }
+
+  async function fetchBalanceLive() {
+    // Try common shapes; normalize to {balance, currency}
+    const tryGet = async (u) => { try { const r = await getJson(u, true); return r.ok ? r.data : null; } catch(_){ return null; } };
+
+    let data = await tryGet("/api/accounts/users/balance");
+    if (!data) data = await tryGet("/api/accounts/users/summary");
+    if (!data) data = await tryGet("/api/users/me");
+
+    let bal = null, cur = "USD";
+    if (data) {
+      if (typeof data.balance === "number") { bal = data.balance; cur = data.currency || cur; }
+      else if (typeof data.cash_balance === "number") { bal = data.cash_balance; cur = data.currency || cur; }
+      else if (data.account && typeof data.account.cash_balance === "number") { bal = data.account.cash_balance; cur = data.account.currency || cur; }
+      else if (Array.isArray(data.accounts) && data.accounts[0] && typeof data.accounts[0].cash_balance === "number") {
+        bal = data.accounts[0].cash_balance; cur = data.accounts[0].currency || cur;
+      }
+    }
+    if (bal != null) setCachedBalance(bal);
+    return { balance: bal, currency: cur };
   }
 
   // =================
@@ -184,6 +242,15 @@
     login,
     me,
     fetch: fetchAuth,
+
+    // redirects
+    getReturnTo,
+    redirectAfterLogin,
+
+    // balance helpers
+    getCachedBalance,
+    setCachedBalance,
+    fetchBalanceLive,
 
     // ACCESS GUARDS
     requireLogin() {

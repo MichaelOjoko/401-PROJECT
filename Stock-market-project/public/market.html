@@ -40,7 +40,6 @@
   <nav>
     <ul>
       <li><a href="index.html" data-top="index.html">Home</a></li>
-      <li><a href="trade.html" data-top="trade.html">Trade</a></li>
       <li><a href="cash.html" data-top="cash.html">Wallet</a></li>
       <li><a href="market.html" data-top="market.html" class="active">Market</a></li>
       <li id="nav-login"><a href="login.html" data-top="login.html">Login</a></li>
@@ -308,7 +307,7 @@
   $('#btnQuickOrder').addEventListener('click', placeQuickOrder);
   $('#btnOpenTrade').addEventListener('click', () => {
     if (!selected) return alert('Select a symbol first.');
-    location.href = `trade.html?symbol=${encodeURIComponent(selected.ticker)}`;
+    location.href = `market.html?symbol=${encodeURIComponent(selected.ticker)}`;
   });
 
   // Filters

@@ -22,8 +22,8 @@
     <nav>
       <ul>
         <li><a href="index.html">Home</a></li>
-        <li><a href="trade.html">Trade</a></li>
-        <li><a href="cash.html">Cash</a></li>
+        <li><a href="cash.html">Wallet</a></li>
+        <li id="nav-market"><a href="market.html" data-top="market.html">Market</a></li>
         <li><a href="login.html" class="active">Login</a></li>
         <li><a href="register.html">Register</a></li>
       </ul>
@@ -60,6 +60,13 @@
   </footer>
 
   <script>
+    // If already authenticated, bounce to returnTo or market.html
+    document.addEventListener("DOMContentLoaded", () => {
+      if (window.AuthAPI?.isAuthenticated && AuthAPI.isAuthenticated()) {
+        window.location.replace(AuthAPI.getReturnTo("market.html"));
+      }
+    });
+
     // Allow Enter key to submit
     document.getElementById('login-password').addEventListener('keydown', e => {
       if (e.key === 'Enter') doLogin();
@@ -95,7 +102,7 @@
           return;
         }
 
-        // Persist token + id + role + name + email
+        // Persist token + id + role + name + email (double-safe; AuthAPI.login already stores)
         const user = (r.data && (r.data.user || r.data)) || {};
         const id   = user.id   ?? user.userId ?? user._id ?? "";
         const role = user.role ?? user.userRole ?? user.type ?? "";
@@ -108,13 +115,8 @@
           role
         });
 
-        // Redirect based on email domain
-        const isAdmin = email.toLowerCase().endsWith("@asu.edu");
-        if (isAdmin) {
-          window.location.href = "admin-hub.html";
-        } else {
-          window.location.href = "index.html";
-        }
+        // ✅ Centralized redirect (honors ?returnTo=..., routes admins to admin-hub, others to market.html)
+        AuthAPI.redirectAfterLogin(email);
 
       } catch (err) {
         errorEl.textContent = err?.message || "Login error.";

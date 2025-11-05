@@ -15,10 +15,9 @@
   <!-- Global styles -->
   <link rel="stylesheet" href="./main.css" />
 
-  <!-- Auth + helpers (provides AuthAPI + logoutUser) -->
+  <!-- Auth + helpers -->
   <script src="./main.js"></script>
 
-  <!-- Page-specific polish that respects your palette -->
   <style>
     :root {
       --hero-bg: var(--navy, #14213D);
@@ -83,14 +82,14 @@
   </style>
 </head>
 <body>
-  <!-- Header / Nav (auth-aware) -->
+  <!-- Header / Nav -->
   <header>
     <div style="font-weight:700">MCM Stocks</div>
     <nav>
       <ul>
         <li><a href="index.html" data-top="index.html">Home</a></li>
-        <li><a href="trade.html" data-top="trade.html">Trade</a></li>
-        <li><a href="cash.html" data-top="cash.html">Cash</a></li>
+        <li><a href="cash.html" data-top="cash.html">Wallet</a></li>
+        <li id="nav-market"><a href="market.html" data-top="market.html">Market</a></li>
         <li id="nav-login"><a href="login.html" data-top="login.html">Login</a></li>
         <li id="nav-register"><a href="register.html" data-top="register.html">Register</a></li>
         <li id="nav-logout" style="display:none;"><a href="#" onclick="logoutUser()">Logout</a></li>
@@ -109,8 +108,8 @@
               <h1>Buy, sell, and manage stocks with confidence</h1>
               <p>Institutional-grade tools with a retail-friendly experience. Your portfolio, your edge.</p>
               <div class="hero-cta">
-                <a href="register.html" class="button positive"><i class="fa fa-user-plus"></i> Create free account</a>
-                <a href="trade.html" class="button ghost"><i class="fa fa-line-chart"></i> Start trading</a>
+                <a id="cta-register" href="register.html" class="button positive"><i class="fa fa-user-plus"></i> Create free account</a>
+                <a href="market.html" class="button ghost"><i class="fa fa-line-chart"></i> Start trading</a>
               </div>
 
               <!-- Slim stats strip -->
@@ -166,7 +165,7 @@
             <p class="muted" style="margin:6px 0 0;">Create an account in minutes and place your first trade today.</p>
           </div>
           <div>
-            <a href="register.html" class="button positive"><i class="fa fa-user-plus"></i> Create account</a>
+            <a id="cta-footer-register" href="register.html" class="button positive"><i class="fa fa-user-plus"></i> Create account</a>
             <a href="login.html" class="button" style="margin-left:8px;"><i class="fa fa-sign-in"></i> Login</a>
           </div>
         </div>
@@ -188,7 +187,7 @@
     });
   </script>
 
-  <!-- Auth-aware nav toggle -->
+  <!-- Auth-aware nav toggle + CTA hide -->
   <script>
     document.addEventListener("DOMContentLoaded", () => {
       const loggedIn = !!(window.AuthAPI && AuthAPI.isAuthenticated && AuthAPI.isAuthenticated());
@@ -200,6 +199,12 @@
         if (logoutItem) logoutItem.style.display = "inline-block";
         if (loginItem)  loginItem.style.display  = "none";
         if (regItem)    regItem.style.display    = "none";
+
+        // Hide CTAs when logged in
+        const cta1 = document.getElementById("cta-register");
+        const cta2 = document.getElementById("cta-footer-register");
+        if (cta1) cta1.style.display = "none";
+        if (cta2) cta2.style.display = "none";
       } else {
         if (logoutItem) logoutItem.style.display = "none";
         if (loginItem)  loginItem.style.display  = "inline-block";
@@ -208,38 +213,54 @@
     });
   </script>
 
-  <!-- Mini market preview (client-side mock; replace with live data later) -->
+  <!-- Mini market preview (LIVE from API) -->
   <script>
-    (function () {
-      const sample = [
-        { s: "AAPL", name: "Apple",     price: 225.42, chg: +1.24 },
-        { s: "NVDA", name: "NVIDIA",    price: 122.12, chg: -0.82 },
-        { s: "TSLA", name: "Tesla",     price: 258.33, chg: +2.31 },
-        { s: "MSFT", name: "Microsoft", price: 426.71, chg: +0.15 },
-        { s: "AMZN", name: "Amazon",    price: 188.06, chg: -1.12 },
-        { s: "META", name: "Meta",      price: 526.44, chg: +0.67 }
-      ];
-      const grid = document.getElementById("mk-grid");
-      if (!grid) return;
-      sample.forEach(t => {
-        const card = document.createElement("div");
-        card.className = "card ticker-card";
-        card.onclick = () => location.href = "trade.html";
-        card.innerHTML = `
+  (async function () {
+    const grid = document.getElementById("mk-grid");
+    if (!grid) return;
+
+    grid.innerHTML = `
+      <div class="card ticker-card"><div class="row"><div><div class="sym">…</div><div class="muted" style="font-size:12px">Loading…</div></div><div style="text-align:right"><div class="price">$—</div><div class="chg">—</div></div></div></div>
+      <div class="card ticker-card"><div class="row"><div><div class="sym">…</div><div class="muted" style="font-size:12px">Loading…</div></div><div style="text-align:right"><div class="price">$—</div><div class="chg">—</div></div></div></div>
+      <div class="card ticker-card"><div class="row"><div><div class="sym">…</div><div class="muted" style="font-size:12px">Loading…</div></div><div style="text-align:right"><div class="price">$—</div><div class="chg">—</div></div></div></div>
+    `;
+
+    try {
+      const res = await fetch("/api/market/assets?limit=12");
+      const payload = await res.json();
+      const stocks = payload?.data || [];
+
+      if (!stocks.length) {
+        grid.innerHTML = `<div class="muted">No symbols yet. Add some via Admin → Create Stock.</div>`;
+        return;
+      }
+
+      grid.innerHTML = stocks.map(s => `
+        <div class="card ticker-card" data-symbol="${s.ticker}">
           <div class="row">
             <div>
-              <div class="sym">${t.s}</div>
-              <div class="muted" style="font-size:12px">${t.name}</div>
+              <div class="sym">${s.ticker}</div>
+              <div class="muted" style="font-size:12px">${s.name}</div>
             </div>
             <div style="text-align:right">
-              <div class="price">$${t.price.toFixed(2)}</div>
-              <div class="chg ${t.chg >= 0 ? 'ok' : 'bad'}">${t.chg >= 0 ? '+' : ''}${t.chg.toFixed(2)}%</div>
+              <div class="price">$${Number(s.initial_price ?? 0).toFixed(2)}</div>
+              <div class="chg ok">0.00%</div>
             </div>
           </div>
-        `;
-        grid.appendChild(card);
+        </div>
+      `).join("");
+
+      grid.querySelectorAll(".ticker-card").forEach(card => {
+        card.addEventListener("click", () => {
+          const sym = card.getAttribute("data-symbol");
+          location.href = `market.html?symbol=${encodeURIComponent(sym)}`;
+        });
       });
-    })();
+
+    } catch (err) {
+      grid.innerHTML = `<div class="error">Failed to load market preview: ${err.message}</div>`;
+    }
+  })();
   </script>
 </body>
 </html>

@@ -1,4 +1,4 @@
-"use strict";
+"use strict"; 
 
 const ApiGateway = require("moleculer-web");
 const jwt = require("jsonwebtoken");
@@ -58,10 +58,15 @@ module.exports = {
 
 					// ========== Stock Management ==========
 					"POST /stocks": "core-logic.createStock",
+					
+					// ========== Market (Read-only for stock lists) ==========
+					"GET /market/assets": "core-logic.listAssets",
+					"GET /market/assets/:ticker": "core-logic.getAsset",
 
 					// ========== Accounts (Cash Management) ==========
 					"POST /accounts/users/deposit": "core-logic.depositCash",
 					"POST /accounts/users/withdraw": "core-logic.withdrawCash",
+					"GET /accounts/users/balance": "core-logic.getBalance",   // <-- added
 					"GET portfolio": "core-logic.getPortfolio", //singal path enfoced on GET?
 
 					// ========== Orders ==========
