@@ -165,6 +165,40 @@ module.exports = {
       }
     },
 
+
+// ---- Get Transaction History
+    getTransactionHistory: {
+      params: { userId: "string" },
+      async handler(ctx) {
+        const res = await pool.query(`
+          SELECT c.type, c.amount, c.created_at
+          FROM cash_txn c
+          JOIN account a ON c.account_id = a.account_id
+          WHERE a.user_id = $1
+          ORDER BY c.created_at DESC
+        `, [ctx.params.userId]);
+        return res.rows;
+      }
+    },
+
+    // ---- Get Order History
+    getOrderHistory: {
+      params: { userId: "string" },
+      async handler(ctx) {
+        const res = await pool.query(`
+          SELECT o.side, s.ticker, o.quantity, o.price, o.status, o.created_at
+          FROM app_order o
+          JOIN account a ON o.account_id = a.account_id
+          JOIN symbol s ON o.symbol_id = s.symbol_id
+          WHERE a.user_id = $1
+          ORDER BY o.created_at DESC
+        `, [ctx.params.userId]);
+        return res.rows;
+      }
+    },
+
+
+
     getPortfolio: {
       params: { userId: "string" },
       async handler(ctx) {

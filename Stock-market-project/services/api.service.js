@@ -68,6 +68,8 @@ module.exports = {
 					"POST /accounts/users/withdraw": "core-logic.withdrawCash",
 					"GET /accounts/users/balance": "core-logic.getBalance",   // <-- added
 					"GET portfolio": "core-logic.getPortfolio", //singal path enfoced on GET?
+					"GET getTransactionHistory": "core-logic.getTransactionHistory", // --NEW func to return transaction history
+					"GET getOrderHistory": "core-logic.getOrderHistory", // --NEW func to return order history
 
 					// ========== Orders ==========
 					"POST /orders/place": "core-logic.placeOrder",
