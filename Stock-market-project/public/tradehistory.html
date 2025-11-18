@@ -19,10 +19,11 @@
     .tbl th { font-weight:700; color: rgba(0,0,0,.7); }
     .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
 
-    /* Optional status chips */
+    /* Status chips */
     .chip { border:1px solid var(--gray); border-radius:999px; padding:4px 10px; font-size:12px; display:inline-block; }
-    .chip.ok { border-color:#1b7f32; color:#1b7f32; background:rgba(27,127,50,.08); }
+    .chip.ok   { border-color:#1b7f32; color:#1b7f32; background:rgba(27,127,50,.08); }
     .chip.wait { border-color:#a37b00; color:#a37b00; background:rgba(163,123,0,.08); }
+    .chip.err  { border-color:#b3261e; color:#b3261e; background:rgba(179,38,30,.08); }
   </style>
 </head>
 <body>
@@ -98,7 +99,7 @@
   <footer class="content"><p class="muted">© 2025 MCM Stocks</p></footer>
 
   <script>
-    // ===== Require auth (enable to protect page) =====
+    // ===== Require auth (protect page) =====
     (function guard(){
       const { token } = (window.AuthAPI && AuthAPI.loadAuth && AuthAPI.loadAuth()) || { token:'' };
       if (!token) location.replace('login.html');
@@ -115,7 +116,122 @@
       );
     })();
 
-    // ===== Auth-aware top nav toggle =====
+    // ===== Helper: format date/time nicely =====
+    function formatDateTime(iso) {
+      if (!iso) return '-';
+      const d = new Date(iso);
+      if (Number.isNaN(d.getTime())) return iso;
+      return d.toLocaleString();
+    }
+
+    // ===== Helper: robustly determine userId =====
+    function resolveUserIdFromAuth(auth) {
+      if (!auth) return null;
+
+      // 1) From stored user object (most likely)
+      const user = auth.user || {};
+      if (user.id) return user.id;
+      if (user.user_id) return user.user_id;
+
+      // 2) From other possible keys the app might have used
+      if (auth.userId) return auth.userId;
+      if (auth.uid) return auth.uid;
+
+      // 3) Decode from JWT payload (backend puts { id, email, role })
+      const token = auth.token;
+      if (token) {
+        try {
+          const parts = token.split('.');
+          if (parts.length === 3) {
+            const payloadJson = atob(parts[1]);
+            const payload = JSON.parse(payloadJson);
+            if (payload.id) return payload.id;
+            if (payload.userId) return payload.userId;
+            if (payload.sub) return payload.sub;
+          }
+        } catch (e) {
+          console.error("Failed to decode JWT payload:", e);
+        }
+      }
+
+      return null;
+    }
+
+    // ===== Fetch real order history from your API =====
+    async function loadOrderHistory() {
+      const tbody = document.getElementById('hist-body');
+      if (!tbody) return;
+
+      tbody.innerHTML = '<tr><td colspan="6">Loading…</td></tr>';
+
+      const auth = (window.AuthAPI && AuthAPI.loadAuth && AuthAPI.loadAuth()) || {};
+      const token = auth.token || '';
+      const userId = resolveUserIdFromAuth(auth);
+
+      console.log("Auth payload on history page:", auth);
+      console.log("Resolved userId:", userId);
+
+      if (!userId) {
+        tbody.innerHTML = '<tr><td colspan="6">Unable to determine user ID.</td></tr>';
+        return;
+      }
+
+      try {
+        // Matches current alias: "GET getOrderHistory": "core-logic.getOrderHistory"
+        const url = `/api/getOrderHistory?userId=${encodeURIComponent(userId)}`;
+
+        const res = await fetch(url, {
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": token ? `Bearer ${token}` : ''
+          }
+        });
+
+        if (!res.ok) {
+          const txt = await res.text();
+          console.error('History fetch failed:', res.status, txt);
+          tbody.innerHTML = `<tr><td colspan="6">Error loading history (${res.status}).</td></tr>`;
+          return;
+        }
+
+        const data = await res.json(); // core-logic.getOrderHistory returns an array
+        if (!Array.isArray(data) || data.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="6">No trades yet.</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = '';
+        data.forEach(row => {
+          // Backend columns: side, ticker, quantity, price, status, created_at
+          const side   = String(row.side || '').toUpperCase();
+          const ticker = row.ticker || '-';
+          const qty    = row.quantity ?? '-';
+          const status = (row.status || 'Filled').toString();
+          const time   = formatDateTime(row.created_at);
+          const type   = 'Market'; // you can wire to actual order type later
+
+          let chipClass = 'chip wait';
+          const statusLower = status.toLowerCase();
+          if (statusLower === 'filled' || statusLower === 'executed') chipClass = 'chip ok';
+          else if (statusLower === 'rejected' || statusLower === 'canceled') chipClass = 'chip err';
+
+          const tr = document.createElement('tr');
+          tr.innerHTML =
+            `<td>${time}</td>
+             <td>${side}</td>
+             <td class="mono">${ticker}</td>
+             <td>${qty}</td>
+             <td>${type}</td>
+             <td><span class="${chipClass}">${status}</span></td>`;
+          tbody.appendChild(tr);
+        });
+      } catch (err) {
+        console.error('Error loading history:', err);
+        tbody.innerHTML = '<tr><td colspan="6">Error loading history.</td></tr>';
+      }
+    }
+
+    // ===== Auth-aware top nav toggle + load history on DOM ready =====
     document.addEventListener("DOMContentLoaded", () => {
       const loggedIn = !!(window.AuthAPI && AuthAPI.isAuthenticated && AuthAPI.isAuthenticated());
       const logoutItem = document.getElementById("nav-logout");
@@ -131,25 +247,8 @@
         if (loginItem)  loginItem.style.display  = "inline-block";
         if (regItem)    regItem.style.display    = "inline-block";
       }
-    });
 
-    // ===== Demo rows (replace with API) =====
-    const rows = [
-      {time:'2025-09-24 14:22', side:'BUY',  sym:'AAPL', qty:50, type:'Market', status:'Filled'},
-      {time:'2025-09-24 11:10', side:'SELL', sym:'TSLA', qty:10, type:'Limit',  status:'Submitted'}
-    ];
-    const tb = document.getElementById('hist-body');
-    rows.forEach(r=>{
-      const tr=document.createElement('tr');
-      const chipClass = r.status === 'Filled' ? 'chip ok' : 'chip wait';
-      tr.innerHTML =
-        `<td>${r.time}</td>
-         <td>${r.side}</td>
-         <td class="mono">${r.sym}</td>
-         <td>${r.qty}</td>
-         <td>${r.type}</td>
-         <td><span class="${chipClass}">${r.status}</span></td>`;
-      tb.appendChild(tr);
+      loadOrderHistory();
     });
   </script>
 </body>
