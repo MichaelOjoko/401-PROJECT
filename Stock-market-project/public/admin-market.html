@@ -27,6 +27,50 @@
     .switch::after { content:""; position:absolute; top:3px; left:3px; width:24px; height:24px; border-radius:50%; background:#fff; border:1px solid var(--gray); transition:left .15s; }
     .switch.on { background:#1b7f32; border-color:#1b7f32; }
     .switch.on::after { left:27px; }
+
+    /* ===== Modal (matches your card/gray scheme) ===== */
+    .modal-backdrop {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,.45);
+      display: none; align-items: center; justify-content: center;
+      z-index: 999;
+    }
+    .modal-backdrop.show { display: flex; }
+
+    .modal-card {
+      width: min(520px, 92vw);
+      background: var(--white);
+      border: 1px solid var(--gray);
+      border-radius: 14px;
+      box-shadow: 0 10px 30px rgba(0,0,0,.2);
+      padding: 16px;
+    }
+    .modal-header {
+      display:flex; align-items:center; justify-content:space-between;
+      border-bottom:1px solid var(--gray);
+      padding-bottom:10px; margin-bottom:12px;
+    }
+    .modal-title { font-weight:800; font-size:18px; }
+    .modal-sub { font-size:13px; color: var(--muted, #777); }
+
+    .modal-grid {
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px 12px;
+    }
+    .modal-grid .field { display:flex; flex-direction:column; gap:6px; }
+    .modal-grid label { font-size:12px; font-weight:700; color:#444; }
+
+    .modal-actions {
+      display:flex; justify-content:flex-end; gap:8px;
+      margin-top:14px; border-top:1px solid var(--gray); padding-top:12px;
+    }
+
+    .edit-pill {
+      display:inline-flex; align-items:center; gap:6px;
+      padding:6px 10px; border-radius:8px; border:1px solid var(--gray);
+      background:#fff; cursor:pointer; font-weight:700;
+    }
   </style>
 </head>
 
@@ -85,7 +129,7 @@
         </div>
         <div class="row">
           <button class="btn-ghost">Export</button>
-          <button class="button positive">Save Changes</button>
+          <button id="saveScheduleBtn" class="button positive">Save Changes</button>
         </div>
       </div>
 
@@ -146,17 +190,10 @@
               <th>Pre-Market</th>
               <th>After-Hours</th>
               <th>Notes</th>
+              <th></th>
             </tr>
           </thead>
-          <tbody>
-            <tr><td>Monday</td><td>09:30–16:00</td><td>04:00–09:30</td><td>16:00–20:00</td><td></td></tr>
-            <tr><td>Tuesday</td><td>09:30–16:00</td><td>04:00–09:30</td><td>16:00–20:00</td><td></td></tr>
-            <tr><td>Wednesday</td><td>09:30–16:00</td><td>04:00–09:30</td><td>16:00–20:00</td><td></td></tr>
-            <tr><td>Thursday</td><td>09:30–16:00</td><td>04:00–09:30</td><td>16:00–20:00</td><td></td></tr>
-            <tr><td>Friday</td><td>09:30–16:00</td><td>04:00–09:30</td><td>16:00–20:00</td><td>Early close on select holidays</td></tr>
-            <tr><td>Saturday</td><td>—</td><td>—</td><td>—</td><td>Closed</td></tr>
-            <tr><td>Sunday</td><td>—</td><td>—</td><td>—</td><td>Closed</td></tr>
-          </tbody>
+          <tbody id="scheduleBody"></tbody>
         </table>
       </div>
 
@@ -168,13 +205,13 @@
             <div class="muted">Full-day & early-close sessions</div>
           </div>
           <div class="row">
-            <input class="input" placeholder="Holiday name…" />
-            <input class="input" type="date" />
-            <select class="input">
-              <option>Closed</option>
-              <option>Early Close (13:00)</option>
+            <input id="holName" class="input" placeholder="Holiday name / description…" />
+            <input id="holDate" class="input" type="date" />
+            <select id="holSession" class="input">
+              <option value="closed">Closed</option>
+              <option value="early_close">Early Close (13:00)</option>
             </select>
-            <button class="button positive">+ Add</button>
+            <button id="holAddBtn" class="button positive">+ Add</button>
           </div>
         </div>
 
@@ -187,26 +224,7 @@
               <th></th>
             </tr>
           </thead>
-          <tbody>
-            <tr>
-              <td>2025-01-01</td>
-              <td>New Year’s Day</td>
-              <td><span class="pill closed">Closed</span></td>
-              <td><a href="#" class="btn-ghost">Remove</a></td>
-            </tr>
-            <tr>
-              <td>2025-07-03</td>
-              <td>Independence Day (Obs.)</td>
-              <td><span class="pill">Early Close 13:00</span></td>
-              <td><a href="#" class="btn-ghost">Remove</a></td>
-            </tr>
-            <tr>
-              <td>2025-12-25</td>
-              <td>Christmas Day</td>
-              <td><span class="pill closed">Closed</span></td>
-              <td><a href="#" class="btn-ghost">Remove</a></td>
-            </tr>
-          </tbody>
+          <tbody id="holBody"></tbody>
         </table>
       </div>
 
@@ -224,5 +242,59 @@
   </main>
 
   <footer>© MCM Stocks</footer>
+
+  <!-- ===== Edit Day Modal ===== -->
+  <div id="editModal" class="modal-backdrop" aria-hidden="true">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div>
+          <div id="modalTitle" class="modal-title">Edit Day</div>
+          <div class="modal-sub">Set trading windows for this day</div>
+        </div>
+        <button id="modalClose" class="btn-ghost" aria-label="Close">✕</button>
+      </div>
+
+      <div class="modal-grid">
+        <div class="field">
+          <label>Regular Open</label>
+          <input id="mRegularOpen" class="input" type="time" />
+        </div>
+        <div class="field">
+          <label>Regular Close</label>
+          <input id="mRegularClose" class="input" type="time" />
+        </div>
+
+        <div class="field">
+          <label>Pre-Market Open</label>
+          <input id="mPreOpen" class="input" type="time" />
+        </div>
+        <div class="field">
+          <label>Pre-Market Close</label>
+          <input id="mPreClose" class="input" type="time" readonly style="opacity:.6" />
+        </div>
+
+        <div class="field">
+          <label>After-Hours Open</label>
+          <input id="mAfterOpen" class="input" type="time" readonly style="opacity:.6" />
+        </div>
+        <div class="field">
+          <label>After-Hours Close</label>
+          <input id="mAfterClose" class="input" type="time" />
+        </div>
+
+        <div class="field" style="grid-column:1 / span 2;">
+          <label>Notes</label>
+          <input id="mNotes" class="input" placeholder="Optional notes for this day" />
+        </div>
+      </div>
+
+      <div class="modal-actions">
+        <button id="modalCancel" class="btn-ghost">Cancel</button>
+        <button id="modalSave" class="button positive">Save Day</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="admin-market.js"></script>
 </body>
 </html>

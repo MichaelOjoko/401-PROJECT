@@ -25,13 +25,12 @@ module.exports = {
         fullName: "string"
       },
       async handler(ctx) {
-        // hash the password before creating user
         const saltRounds = 10;
         const passwordHash = await bcrypt.hash(ctx.params.password, saltRounds);
 
         const user = await this.createUser({
           email: ctx.params.email,
-          passwordHash,       // pass hashed password
+          passwordHash,
           fullName: ctx.params.fullName
         });
 
@@ -45,7 +44,6 @@ module.exports = {
         password: "string"
       },
       async handler(ctx) {
-        // check DB
         const user = await this.verifyUser(ctx.params.email, ctx.params.password);
         if (!user) {
           return { success: false, message: "Invalid credentials" };
@@ -151,7 +149,6 @@ module.exports = {
       }
     },
 
-    // ---- fetch balance for a user
     getBalance: {
       params: { userId: "string" },
       async handler(ctx) {
@@ -165,8 +162,6 @@ module.exports = {
       }
     },
 
-
-// ---- Get Transaction History
     getTransactionHistory: {
       params: { userId: "string" },
       async handler(ctx) {
@@ -181,7 +176,6 @@ module.exports = {
       }
     },
 
-    // ---- Get Order History
     getOrderHistory: {
       params: { userId: "string" },
       async handler(ctx) {
@@ -196,8 +190,6 @@ module.exports = {
         return res.rows;
       }
     },
-
-
 
     getPortfolio: {
       params: { userId: "string" },
@@ -224,7 +216,144 @@ module.exports = {
       async handler(ctx) {
         return await this.cancelOrder(ctx.params.orderId);
       }
-    }
+    },
+
+    // ========== ADMIN MARKET (MATCHING YOUR SCHEMA) ==========
+
+    isMarketOpen: {
+      async handler() {
+        const now = new Date();
+        const todayStr = now.toISOString().slice(0, 10);
+
+        // 1) Manual override?
+        const st = await pool.query(
+          `SELECT manual_override, manual_is_open
+           FROM market_state WHERE id=1 LIMIT 1`
+        );
+        if (st.rows[0]?.manual_override) {
+          return { ok: true, open: !!st.rows[0].manual_is_open, source: "manual" };
+        }
+
+        // 2) Holiday today?
+        const hol = await pool.query(
+          `SELECT session_type FROM market_holiday WHERE holiday_date=$1 LIMIT 1`,
+          [todayStr]
+        );
+        if (hol.rows.length && hol.rows[0].session_type === "closed") {
+          return { ok: true, open: false, source: "holiday" };
+        }
+
+        // 3) Weekly schedule
+        const dow = now.getDay(); // 0 Sun ... 6 Sat
+        const sched = await pool.query(
+          `SELECT regular_open, regular_close
+           FROM market_schedule
+           WHERE day_index=$1 LIMIT 1`,
+          [dow]
+        );
+
+        if (!sched.rows.length) return { ok: true, open: false, source: "schedule" };
+
+        const openTime = sched.rows[0].regular_open;
+        const closeTime = sched.rows[0].regular_close;
+        if (!openTime || !closeTime) {
+          return { ok: true, open: false, source: "schedule" };
+        }
+
+        const [oh, om] = String(openTime).split(":").map(Number);
+        const [ch, cm] = String(closeTime).split(":").map(Number);
+        const minsNow = now.getHours() * 60 + now.getMinutes();
+        const minsOpen = oh * 60 + om;
+        const minsClose = ch * 60 + cm;
+
+        return {
+          ok: true,
+          open: minsNow >= minsOpen && minsNow < minsClose,
+          source: "schedule"
+        };
+      }
+    },
+
+    getMarketSchedule: {
+      async handler() {
+        const { rows } = await pool.query(
+          `SELECT *
+           FROM market_schedule
+           ORDER BY day_index ASC`
+        );
+        return { ok: true, data: rows };
+      }
+    },
+
+    updateMarketSchedule: {
+      auth: "required",
+      params: {
+        schedule: { type: "array", items: "object" }
+      },
+      async handler(ctx) {
+        this.assertAdmin(ctx);
+        return await this.upsertMarketSchedule(ctx.params.schedule);
+      }
+    },
+
+    getAllHolidays: {
+      async handler() {
+        const { rows } = await pool.query(
+          `SELECT holiday_date, description, session_type
+           FROM market_holiday
+           ORDER BY holiday_date ASC`
+        );
+        return { ok: true, data: rows };
+      }
+    },
+
+    addHoliday: {
+      auth: "required",
+      params: {
+        holiday_date: "string",
+        description: "string",
+        session_type: "string"
+      },
+      async handler(ctx) {
+        this.assertAdmin(ctx);
+        const { holiday_date, description, session_type } = ctx.params;
+
+        const { rows } = await pool.query(
+          `INSERT INTO market_holiday (holiday_date, description, session_type)
+           VALUES ($1,$2,$3)
+           ON CONFLICT (holiday_date)
+           DO UPDATE SET description=EXCLUDED.description, session_type=EXCLUDED.session_type
+           RETURNING holiday_date, description, session_type`,
+          [holiday_date, description, session_type]
+        );
+        return { ok: true, data: rows[0] };
+      }
+    },
+
+    deleteHoliday: {
+      auth: "required",
+      params: { holiday_date: "string" },
+      async handler(ctx) {
+        this.assertAdmin(ctx);
+
+        const { rows } = await pool.query(
+          `DELETE FROM market_holiday
+           WHERE holiday_date=$1
+           RETURNING holiday_date, description`,
+          [ctx.params.holiday_date]
+        );
+        return { ok: true, deleted: rows[0] || null };
+      }
+    },
+
+    deleteAllHolidays: {
+      auth: "required",
+      async handler(ctx) {
+        this.assertAdmin(ctx);
+        await pool.query(`DELETE FROM market_holiday`);
+        return { ok: true };
+      }
+    },
   },
 
   methods: {
@@ -316,7 +445,6 @@ module.exports = {
 
     // ============ PORTFOLIO ============
     async getUserPortfolio(userId) {
-      // 1) Try the canonical positions table first
       const query = `
         SELECT s.ticker, s.name, p.quantity, p.avg_cost
         FROM position p
@@ -327,15 +455,12 @@ module.exports = {
       const res = await pool.query(query, [userId]);
       if (res.rows.length > 0) return res.rows;
 
-      // 2) Fallback: derive from historical orders (buys - sells), ignore canceled
       const derived = await pool.query(
         `
         SELECT
           s.ticker,
           s.name,
-          /* net quantity: buys - sells */
           SUM(CASE WHEN o.side='buy' THEN o.quantity ELSE -o.quantity END)::numeric AS quantity,
-          /* weighted average cost from BUY legs only */
           CASE
             WHEN SUM(CASE WHEN o.side='buy' THEN o.quantity ELSE 0 END) > 0
               THEN (
@@ -355,7 +480,6 @@ module.exports = {
         [userId]
       );
 
-      // map numeric -> Number for frontend
       return (derived.rows || []).map(r => ({
         ticker: r.ticker,
         name: r.name,
@@ -366,7 +490,6 @@ module.exports = {
 
     // ============ ORDERS ============
     async placeOrder({ userId, symbol, side, quantity }) {
-      // Enforce positive integer quantity & listed symbols only
       const qtyNum = Number(quantity);
       if (!Number.isFinite(qtyNum) || qtyNum <= 0 || !Number.isInteger(qtyNum)) {
         throw new Error("Quantity must be a positive integer");
@@ -377,7 +500,6 @@ module.exports = {
       try {
         await client.query("BEGIN");
 
-        // Lock account
         const accRes = await client.query(
           `SELECT account_id, cash_balance FROM account WHERE user_id=$1 FOR UPDATE`,
           [userId]
@@ -385,7 +507,6 @@ module.exports = {
         if (accRes.rows.length === 0) throw new Error("Account not found");
         const account = accRes.rows[0];
 
-        // Only allow listed symbols
         const normTicker = String(symbol).toUpperCase().trim();
         const symRes = await client.query(
           `SELECT symbol_id, ticker, name, initial_price FROM symbol WHERE ticker=$1`,
@@ -402,13 +523,11 @@ module.exports = {
         if (side === "buy") {
           if (Number(account.cash_balance) < notional) throw new Error("Insufficient funds");
 
-          // Debit cash
           await client.query(
             `UPDATE account SET cash_balance = cash_balance - $1 WHERE account_id=$2`,
             [notional, account.account_id]
           );
 
-          // Upsert position with weighted average
           const posRes = await client.query(
             `SELECT position_id, quantity, avg_cost
                FROM position
@@ -436,7 +555,6 @@ module.exports = {
             );
           }
         } else {
-          // SELL
           const posRes = await client.query(
             `SELECT position_id, quantity, avg_cost
                FROM position
@@ -451,13 +569,11 @@ module.exports = {
 
           const newQty = curQty - qtyNum;
 
-          // Credit cash
           await client.query(
             `UPDATE account SET cash_balance = cash_balance + $1 WHERE account_id=$2`,
             [notional, account.account_id]
           );
 
-          // Reduce or remove position
           if (newQty > 0) {
             await client.query(
               `UPDATE position SET quantity=$1 WHERE position_id=$2`,
@@ -471,7 +587,6 @@ module.exports = {
           }
         }
 
-        // Record order
         const orderRes = await client.query(
           `INSERT INTO app_order (account_id, symbol_id, side, quantity, price)
            VALUES ($1,$2,$3,$4,$5) RETURNING *`,
@@ -495,6 +610,64 @@ module.exports = {
       );
       if (res.rows.length === 0) throw new Error("Order not found");
       return res.rows[0];
-    }
+    },
+
+    // ====== ADMIN MARKET HELPERS ======
+    assertAdmin(ctx) {
+      const user = ctx.meta.user;
+      if (!user || user.role !== "admin") {
+        throw new Error("Admin access required");
+      }
+    },
+
+    async upsertMarketSchedule(scheduleRows) {
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+
+        for (const r of scheduleRows) {
+          const {
+            day_index,
+            day_name,
+            regular_open,
+            regular_close,
+            pre_open,
+            after_close,
+            notes = ""
+          } = r;
+
+          await client.query(
+            `INSERT INTO market_schedule
+               (day_index, day_name, regular_open, regular_close, pre_open, after_close, notes)
+             VALUES ($1,$2,$3,$4,$5,$6,$7)
+             ON CONFLICT (day_index)
+             DO UPDATE SET
+               day_name=EXCLUDED.day_name,
+               regular_open=EXCLUDED.regular_open,
+               regular_close=EXCLUDED.regular_close,
+               pre_open=EXCLUDED.pre_open,
+               after_close=EXCLUDED.after_close,
+               notes=EXCLUDED.notes`,
+            [
+              day_index,
+              day_name,
+              regular_open,
+              regular_close,
+              pre_open,
+              after_close,
+              notes
+            ]
+          );
+        }
+
+        await client.query("COMMIT");
+        return { ok: true };
+      } catch (e) {
+        await client.query("ROLLBACK");
+        throw e;
+      } finally {
+        client.release();
+      }
+    },
   }
 };
