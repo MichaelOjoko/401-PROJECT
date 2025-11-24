@@ -344,6 +344,34 @@
   }
 
   // Init
+  // ========= Random Price Generator =========
+  function fluctuatePrices() {
+    if (!all?.length) return;
+
+    all = all.map(stock => {
+      const price = Number(stock.initial_price || 0);
+      if (price <= 0) return stock;
+
+      // Random fluctuation: -2% to +2%
+      const changePercent = (Math.random() - 0.5) * 0.04;
+      const newPrice = price * (1 + changePercent);
+
+      return {
+        ...stock,
+        initial_price: newPrice,
+        change_percent: changePercent * 100
+      };
+    });
+
+    renderTable();
+
+    // If a symbol is selected, update drawer info too
+    if (selected) {
+      const updated = all.find(x => x.ticker === selected.ticker);
+      if (updated) selectSymbol(updated);
+    }
+  }
+
   document.addEventListener('DOMContentLoaded', async ()=>{
     const loggedIn = !!(window.AuthAPI && AuthAPI.isAuthenticated && AuthAPI.isAuthenticated());
     const logoutItem = document.getElementById("nav-logout");
@@ -353,6 +381,9 @@
     } else { if (logoutItem) logoutItem.style.display='none'; if (loginItem) loginItem.style.display='inline-block'; if (regItem) regItem.style.display='inline-block'; }
 
     await loadList();
+    // Start fluctuating prices every 5 seconds
+    setInterval(fluctuatePrices, 5000);
+
   });
 </script>
 </body>
