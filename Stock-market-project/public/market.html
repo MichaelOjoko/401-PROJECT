@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!DOCTYPE html> 
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -51,6 +51,11 @@
 
 <main class="content">
   <h2 style="margin:8px 0 14px;">Market</h2>
+
+  <div id="market-banner" class="card" style="display:none; padding:10px 12px; margin-bottom:12px; border-left:6px solid var(--bad);">
+    <strong>Market Closed</strong>
+    <span class="muted" id="market-banner-msg" style="margin-left:6px;"></span>
+  </div>
 
   <div class="card tools" style="margin-bottom:12px;">
     <input id="q" class="input" placeholder="Search by ticker or name…" style="flex:1; min-width:240px;">
@@ -154,7 +159,6 @@
   }
 
   async function httpJson(url, opts={}) {
-    // Use authenticated fetch when available
     if (window.AuthAPI?.fetch) {
       const r = await AuthAPI.fetch(url, { headers:{'Content-Type':'application/json'}, ...opts });
       return r.data ?? {};
@@ -163,13 +167,51 @@
     return r.json();
   }
 
-  // ========= State =========
   let all = [];
   let page = 1;
   let pageSize = 12;
   let selected = null;
 
-  // ========= Load list =========
+  let marketOpen = true;
+  let marketReason = "open";
+
+  async function refreshMarketStatus() {
+    try {
+      const st = await httpJson("/api/market/market-open");
+      marketOpen = !!st.open;
+      marketReason = st.source || "schedule";
+
+      const banner = $("#market-banner");
+      const bannerMsg = $("#market-banner-msg");
+
+      if (!marketOpen) {
+        banner.style.display = "block";
+        let msg = "Trading is disabled right now.";
+        if (marketReason === "holiday") msg = "Closed for a holiday.";
+        if (marketReason === "schedule") msg = "Outside regular hours.";
+        bannerMsg.textContent = msg;
+      } else {
+        banner.style.display = "none";
+        bannerMsg.textContent = "";
+      }
+
+      $$('button[data-act="buy"], button[data-act="sell"]').forEach(b => {
+        b.disabled = !marketOpen;
+        b.style.opacity = marketOpen ? "1" : "0.5";
+        b.title = marketOpen ? "" : "Market is closed";
+      });
+
+      const qBtn = $("#btnQuickOrder");
+      if (qBtn) {
+        qBtn.disabled = !marketOpen;
+        qBtn.style.opacity = marketOpen ? "1" : "0.6";
+        qBtn.title = marketOpen ? "" : "Market is closed";
+      }
+    } catch (e) {
+      console.warn("Market status fetch failed:", e.message);
+    }
+  }
+
   async function loadList() {
     $('#rows').innerHTML = `<tr><td colspan="6">Loading…</td></tr>`;
     const q = $('#q').value.trim();
@@ -234,9 +276,16 @@
     }
 
     if (!selected && view[0]) selectSymbol(view[0]);
+
+    if (!marketOpen) {
+      $$('button[data-act="buy"], button[data-act="sell"]').forEach(b => {
+        b.disabled = true;
+        b.style.opacity = "0.5";
+        b.title = "Market is closed";
+      });
+    }
   }
 
-  // ========= Drawer =========
   function selectSymbol(r) {
     selected = r;
     $('#dSym').textContent = r.ticker;
@@ -266,13 +315,17 @@
     }
   }
 
-  // ========= Quick order (also adjusts cash) =========
   async function placeQuickOrder() {
     const u = getUserId();
     if (!u) { alert('Please login first.'); location.href='login.html'; return; }
     if (!selected) { alert('Select a symbol first.'); return; }
 
     const side = $('#side').value;
+    if (!marketOpen) {
+      alert("Market is closed. You can’t place orders right now.");
+      return;
+    }
+
     const qty  = Math.max(1, parseInt($('#qty').value||'1',10));
 
     try {
@@ -282,7 +335,6 @@
       });
 
       if (payload?.order_id || payload?.id || payload?.symbol_id || payload?.account_id || payload?.success) {
-        // Adjust cash: withdraw on buy, deposit on sell
         const tradeAmount = Number(selected.initial_price || 0) * qty;
         if (tradeAmount > 0) {
           if (side === 'buy') {
@@ -290,7 +342,6 @@
           } else {
             await AuthAPI.fetch('/api/accounts/users/deposit',  { method:'POST', body: JSON.stringify({ amount: tradeAmount, reason: 'SELL '+selected.ticker }) });
           }
-          // refresh cached balance for all pages
           await AuthAPI.fetchBalanceLive();
         }
         alert(`Order accepted: ${side.toUpperCase()} ${qty} ${selected.ticker}`);
@@ -310,12 +361,10 @@
     location.href = `market.html?symbol=${encodeURIComponent(selected.ticker)}`;
   });
 
-  // Filters
   $('#btnApply').addEventListener('click', ()=>{ page=1; renderTable(); });
   $('#btnReset').addEventListener('click', ()=>{ $('#q').value=''; $('#fExchange').value=''; $('#fSector').value=''; $('#sortBy').value='ticker'; page=1; renderTable(); });
   $('#q').addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ page=1; loadList(); } });
 
-  // Synthetic candles
   function drawCandles(canvasId, base) {
     const c = document.getElementById(canvasId);
     const ctx = c.getContext('2d');
@@ -343,8 +392,6 @@
     });
   }
 
-  // Init
-  // ========= Random Price Generator =========
   function fluctuatePrices() {
     if (!all?.length) return;
 
@@ -352,7 +399,6 @@
       const price = Number(stock.initial_price || 0);
       if (price <= 0) return stock;
 
-      // Random fluctuation: -2% to +2%
       const changePercent = (Math.random() - 0.5) * 0.04;
       const newPrice = price * (1 + changePercent);
 
@@ -365,7 +411,6 @@
 
     renderTable();
 
-    // If a symbol is selected, update drawer info too
     if (selected) {
       const updated = all.find(x => x.ticker === selected.ticker);
       if (updated) selectSymbol(updated);
@@ -381,9 +426,11 @@
     } else { if (logoutItem) logoutItem.style.display='none'; if (loginItem) loginItem.style.display='inline-block'; if (regItem) regItem.style.display='inline-block'; }
 
     await loadList();
-    // Start fluctuating prices every 5 seconds
-    setInterval(fluctuatePrices, 5000);
 
+    await refreshMarketStatus();
+    setInterval(refreshMarketStatus, 60000);
+
+    setInterval(fluctuatePrices, 5000);
   });
 </script>
 </body>

@@ -220,21 +220,13 @@ module.exports = {
 
     // ========== ADMIN MARKET (MATCHING YOUR SCHEMA) ==========
 
+    // ✅ MODIFIED: manual override removed. Schedule + holidays only.
     isMarketOpen: {
       async handler() {
         const now = new Date();
         const todayStr = now.toISOString().slice(0, 10);
 
-        // 1) Manual override?
-        const st = await pool.query(
-          `SELECT manual_override, manual_is_open
-           FROM market_state WHERE id=1 LIMIT 1`
-        );
-        if (st.rows[0]?.manual_override) {
-          return { ok: true, open: !!st.rows[0].manual_is_open, source: "manual" };
-        }
-
-        // 2) Holiday today?
+        // 1) Holiday today?
         const hol = await pool.query(
           `SELECT session_type FROM market_holiday WHERE holiday_date=$1 LIMIT 1`,
           [todayStr]
@@ -243,7 +235,7 @@ module.exports = {
           return { ok: true, open: false, source: "holiday" };
         }
 
-        // 3) Weekly schedule
+        // 2) Weekly schedule
         const dow = now.getDay(); // 0 Sun ... 6 Sat
         const sched = await pool.query(
           `SELECT regular_open, regular_close
@@ -489,12 +481,53 @@ module.exports = {
     },
 
     // ============ ORDERS ============
+    // ✅ MODIFIED: Enforce market-open for BOTH BUY and SELL.
     async placeOrder({ userId, symbol, side, quantity }) {
       const qtyNum = Number(quantity);
       if (!Number.isFinite(qtyNum) || qtyNum <= 0 || !Number.isInteger(qtyNum)) {
         throw new Error("Quantity must be a positive integer");
       }
       if (!["buy", "sell"].includes(side)) throw new Error("Invalid side");
+
+      // ✅ Market must be open for any trade
+      {
+        const now = new Date();
+        const todayStr = now.toISOString().slice(0, 10);
+
+        // 1) Holiday?
+        const hol = await pool.query(
+          `SELECT session_type FROM market_holiday WHERE holiday_date=$1 LIMIT 1`,
+          [todayStr]
+        );
+        if (hol.rows.length && hol.rows[0].session_type === "closed") {
+          throw new Error("Market is closed for a holiday.");
+        }
+
+        // 2) Regular schedule
+        const dow = now.getDay();
+        const sched = await pool.query(
+          `SELECT regular_open, regular_close
+           FROM market_schedule
+           WHERE day_index=$1 LIMIT 1`,
+          [dow]
+        );
+        if (!sched.rows.length) throw new Error("Market is closed.");
+
+        const openTime = sched.rows[0].regular_open;
+        const closeTime = sched.rows[0].regular_close;
+        if (!openTime || !closeTime) throw new Error("Market is closed.");
+
+        const [oh, om] = String(openTime).split(":").map(Number);
+        const [ch, cm] = String(closeTime).split(":").map(Number);
+
+        const minsNow = now.getHours() * 60 + now.getMinutes();
+        const minsOpen = oh * 60 + om;
+        const minsClose = ch * 60 + cm;
+
+        if (!(minsNow >= minsOpen && minsNow < minsClose)) {
+          throw new Error("Market is closed.");
+        }
+      }
 
       const client = await pool.connect();
       try {
